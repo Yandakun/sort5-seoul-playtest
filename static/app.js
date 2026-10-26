@@ -3,16 +3,46 @@ let state = null;
 let selectedCard = null;
 let selectedTarget = null;
 let missionSide = 'rules';
+let selectedHomeMission = 1;
+let homeCardSide = 'story';
 let errorText = '';
 let polling = false;
 let actionBusy = false;
 let journalPerson = 'all';
+let historyUnlocked = false;
+let historyVisible = false;
+let historyWarningOpen = false;
 let overlay = null;
 let lastSnapshotSignature = '';
 const PARAMS = new URLSearchParams(window.location.search);
 const INSPECT = PARAMS.has('inspect') ? Number(PARAMS.get('inspect')) : null;
 const qRoom = (PARAMS.get('room') || '').toUpperCase();
 let credentials = null;
+// Keep lobby input values through UI re-renders (including mission previews).
+const lobbyDraft = { createName: '', joinName: '', joinCode: qRoom, humans: '1', debug: false };
+function captureLobbyDraft() {
+  const create = id('create-form'), join = id('join-form');
+  if (create) {
+    lobbyDraft.createName = create.elements.namedItem('name')?.value ?? lobbyDraft.createName;
+    lobbyDraft.humans = create.elements.namedItem('humans')?.value ?? lobbyDraft.humans;
+    lobbyDraft.debug = !!create.elements.namedItem('debug')?.checked;
+  }
+  if (join) {
+    lobbyDraft.joinName = join.elements.namedItem('name')?.value ?? lobbyDraft.joinName;
+    lobbyDraft.joinCode = join.elements.namedItem('code')?.value ?? lobbyDraft.joinCode;
+  }
+}
+function bindLobbyDraft() {
+  const update = () => captureLobbyDraft();
+  for (const formId of ['create-form', 'join-form']) {
+    const form = id(formId);
+    if (form) {
+      form.addEventListener('input', update);
+      form.addEventListener('change', update);
+    }
+  }
+}
+
 const escapeHTML = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id = x => document.getElementById(x);
 const assets = file => `/static/assets/${file}`;
@@ -49,6 +79,7 @@ async function loadState(){
     lastSnapshotSignature=sig;
     state=next;
     if(old && (old.phase !== next.phase || old.turn !== next.turn || old.mission !== next.mission)) { selectedCard = null;selectedTarget=null; }
+    if(old && old.mission !== next.mission) {historyUnlocked=false;historyVisible=false;historyWarningOpen=false;journalPerson='all';}
     errorText='';render();
   } catch(e){errorText=e.message;render();}
   finally {polling=false;}
@@ -70,25 +101,67 @@ function topBar(){
   const subtitle = state ? `MISSION // SEOUL 0${state.mission}` : 'ONLINE CO-OP PLAYTEST';
   return `<header class="brandbar"><div class="brand">S.O.R.T. <b>5</b><small>${subtitle}</small></div><div class="header-right">${state?`<span class="chip">${state.humans} human · ${4-state.humans} AI</span><button type="button" class="chip code" data-do="copy">ROOM ${escapeHTML(state.code)} ⧉</button><button type="button" class="chip leave-btn" data-do="leave">Leave Game</button>`:''}</div></header>`;
 }
+function missionImage(mission,side){
+  return assets(`seoul_${String(mission).padStart(2,'0')}_${side==='story'?'front':'back'}.png`);
+}
+function homePreview(){
+  return `<div class="preview-title"><strong>SEOUL #${String(selectedHomeMission).padStart(2,'0')}</strong><span>Preview before creating a room</span></div>
+    <div class="preview-tabs"><button type="button" data-home-side="story" class="${homeCardSide==='story'?'active':''}">Story</button><button type="button" data-home-side="rules" class="${homeCardSide==='rules'?'active':''}">Rules</button></div>
+    <button type="button" class="home-card-open" data-home-open="true" title="Click to enlarge ${homeCardSide} card"><img src="${missionImage(selectedHomeMission,homeCardSide)}" alt="Seoul mission ${selectedHomeMission} ${homeCardSide} card" loading="lazy"><span>Click card to enlarge ↗</span></button>`;
+}
+function wireHomePreview(){
+  document.querySelectorAll('[data-home-side]').forEach(b=>b.addEventListener('click',()=>{homeCardSide=b.dataset.homeSide;renderHomePreview();}));
+  document.querySelector('[data-home-open]')?.addEventListener('click',()=>openMissionLightbox(selectedHomeMission,homeCardSide));
+}
+function renderHomePreview(){
+  const el=id('home-mission-preview');if(!el)return;
+  el.innerHTML=homePreview();wireHomePreview();
+}
+function openMissionLightbox(mission,side){
+  const existing=id('mission-lightbox');if(existing)existing.remove();
+  const shade=document.createElement('div');shade.id='mission-lightbox';shade.className='mission-lightbox';
+  shade.setAttribute('role','presentation');
+  shade.innerHTML=`<div class="mission-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Seoul Mission ${mission} ${side} card">
+    <header><strong>SEOUL #${String(mission).padStart(2,'0')}</strong><div><button type="button" data-lightbox-side="story" class="${side==='story'?'active':''}">Story</button><button type="button" data-lightbox-side="rules" class="${side==='rules'?'active':''}">Rules</button><button type="button" class="lightbox-close" aria-label="Close">✕</button></div></header>
+    <img src="${missionImage(mission,side)}" alt="Seoul mission ${mission} ${side} card" />
+    <p>Click outside or press Escape to close.</p></div>`;
+  document.body.appendChild(shade);
+  shade.addEventListener('click',e=>{if(e.target===shade || e.target.closest('.lightbox-close'))shade.remove();});
+  shade.querySelectorAll('[data-lightbox-side]').forEach(b=>b.addEventListener('click',()=>openMissionLightbox(mission,b.dataset.lightboxSide)));
+  shade.querySelector('.lightbox-close').focus();
+}
 function welcome(){
+  captureLobbyDraft();
   app.innerHTML = `<div class="main welcome">${topBar()}<section class="hero"><div class="eyebrow">Happy Baobab / Digital Playtest</div><h1>Mission <span>S.O.R.T. 5</span></h1><p>Exchange information without speaking freely. Read each other's reactions, manage your Time Chips, and complete all four Information Sets.</p></section>
   <div class="welcome-grid"><section class="panel"><h2>Create a game room</h2><form id="create-form">
-    <div class="field"><label>Your name</label><input name="name" maxlength="32" placeholder="e.g. Martin" required /></div>
-    <div class="field"><label>Mission (Seoul)</label><select name="mission">${[1,2,3,4,5].map(n=>`<option value="${n}">Seoul #0${n}</option>`).join('')}</select></div>
-    <div class="field"><label>Human players</label><select name="humans"><option value="1">1 human + 3 AI</option><option value="2">2 humans + 2 AI</option><option value="3">3 humans + 1 AI</option><option value="4">4 humans (online room)</option></select></div>
-    <div class="field" style="flex-direction:row;align-items:center"><input type="checkbox" style="width:auto" name="debug" id="debug"><label for="debug" style="text-transform:none">Enable test-only seat inspection (host)</label></div>
+    <div class="field"><label>Your name</label><input name="name" maxlength="32" placeholder="e.g. Martin" value="${escapeHTML(lobbyDraft.createName)}" required /></div>
+    <div class="field"><label id="mission-picker-label">Mission (Seoul)</label><input type="hidden" id="home-mission" name="mission" value="${selectedHomeMission}" /><div class="mission-pick-buttons" role="group" aria-labelledby="mission-picker-label">${[1,2,3,4,5].map(n=>`<button type="button" class="mission-pick ${selectedHomeMission===n?'active':''}" data-pick-mission="${n}" aria-pressed="${selectedHomeMission===n}">#0${n}</button>`).join('')}</div></div>
+    <div id="home-mission-preview" class="home-mission-preview">${homePreview()}</div>
+    <div class="field"><label>Human players</label><select name="humans"><option value="1" ${lobbyDraft.humans==='1'?'selected':''}>1 human + 3 AI</option><option value="2" ${lobbyDraft.humans==='2'?'selected':''}>2 humans + 2 AI</option><option value="3" ${lobbyDraft.humans==='3'?'selected':''}>3 humans + 1 AI</option><option value="4" ${lobbyDraft.humans==='4'?'selected':''}>4 humans (online room)</option></select></div>
+    
     <button class="btn primary full" type="submit">Create room</button></form>
-    <p class="small-note">Each human connects in their own browser. One player and three AI work immediately; 4-human online play requires a server reachable by all participants.</p></section>
+    <p class="small-note">Each human connects in their own browser. One player and three AI work immediately; Share the invitation link so everyone can join from their own device.</p></section>
   <section class="panel"><h2>Join an existing room</h2><form id="join-form">
-    <div class="field"><label>Your name</label><input name="name" maxlength="32" placeholder="Your nickname" required /></div>
-    <div class="field"><label>Room code</label><input name="code" id="join-code" value="${escapeHTML(qRoom)}" maxlength="6" placeholder="6-digit code" required /></div>
+    <div class="field"><label>Your name</label><input name="name" maxlength="32" placeholder="Your nickname" value="${escapeHTML(lobbyDraft.joinName)}" required /></div>
+    <div class="field"><label>Room code</label><input name="code" id="join-code" value="${escapeHTML(lobbyDraft.joinCode)}" maxlength="6" placeholder="6-digit code" required /></div>
     <button class="btn full" type="submit">Join room</button></form>
     <p class="mini-title" style="margin-top:29px">How it works</p>
     <div class="status"><div class="status-line"><span>Information Cards</span>20 (4 colors × 1–5)</div><div class="status-line"><span>Starting Card</span>1</div><div class="status-line"><span>Mission Cards</span>Seoul #01–05</div><div class="status-line"><span>Goal</span>Complete 4 color sets</div></div></section></div>
   <div class="rule-strip"><span>Hidden hands by default</span><span>Face-up card exceptions</span><span>Server-checked turns</span><span>5 Seoul missions</span></div></div>`;
+  document.querySelectorAll('[data-pick-mission]').forEach(button=>button.addEventListener('click',()=>{
+    selectedHomeMission=Number(button.dataset.pickMission);
+    id('home-mission').value=String(selectedHomeMission);
+    document.querySelectorAll('[data-pick-mission]').forEach(b=>{
+      const active=Number(b.dataset.pickMission)===selectedHomeMission;
+      b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+    });
+    renderHomePreview();
+  }));
+  wireHomePreview();
+  bindLobbyDraft();
   id('create-form').onsubmit = async (e)=>{
     e.preventDefault();const f=new FormData(e.target);
-    try{const ans=await request('/api/new',{name:f.get('name').trim(),mission:Number(f.get('mission')),humans:Number(f.get('humans')),debug:f.get('debug')==='on'});store({...ans,debugOwner:f.get('debug')==='on'});await loadState();}catch(ex){alert(ex.message);}
+    try{const ans=await request('/api/new',{name:f.get('name').trim(),mission:Number(f.get('mission')),humans:Number(f.get('humans')),debug:false});store({...ans,debugOwner:false});await loadState();}catch(ex){alert(ex.message);}
   };
   id('join-form').onsubmit = async (e)=>{
     e.preventDefault();const f=new FormData(e.target);
@@ -112,11 +185,21 @@ function ruleShort(){
     5: 'No additional mission rules. Follow the basic rules.'
   }[state.mission];
 }
+function missionCardPanel(){
+  const n=String(state.mission).padStart(2,'0');
+  return `<section class="mission-card-side" aria-label="Current mission cards">
+    <header class="mission-card-heading"><strong>${state.phase==='lobby'?'SELECTED MISSION':'MISSION CARDS'}</strong><span>SEOUL #${n}</span></header>
+    <div class="mission-card-grid mission-card-vertical">
+      <button type="button" class="mission-card-thumb" data-open-mission="story" title="Enlarge mission story"><img src="${missionImage(state.mission,'story')}" alt="Mission story card" loading="lazy"/><span>Story <b>↗</b></span></button>
+      <button type="button" class="mission-card-thumb" data-open-mission="rules" title="Enlarge mission rules"><img src="${missionImage(state.mission,'rules')}" alt="Mission rules card" loading="lazy"/><span>Rules <b>↗</b></span></button>
+    </div>
+  </section>`;
+}
 function missionRibbon(){
   const n=String(state.mission).padStart(2,'0');
   return `<section class="mission-ribbon" aria-label="Current mission">
     <div class="ribbon-title"><span class="ribbon-city">SEOUL</span><strong>#${n}</strong><span class="ribbon-star">★</span></div>
-    <div class="ribbon-rule"><span class="rule-kicker">MISSION RULE</span><strong>${ruleShort()}</strong></div>
+    <div class="ribbon-rule"><span class="rule-kicker">GOAL</span><strong>Complete 4 Information Sets</strong></div>
     <button class="secondary-pill" data-overlay="mission" title="View mission card">Mission Card <span>↗</span></button>
     <button class="secondary-pill" data-overlay="help" title="Basic game rules">Help <span>?</span></button>
   </section>`;
@@ -124,13 +207,14 @@ function missionRibbon(){
 function playerBoard(){
   const me=state.me;
   const canTarget=state.inspect===null && state.phase==='turn' && state.turn===me && selectedCard;
-  return `<section class="seat-board" aria-label="player status"><div class="section-top"><h2>Team Status <span>TEAM STATUS</span></h2><span class="tiny-label">Select a character to see cards they received</span></div>
+  return `<section class="seat-board" aria-label="player status"><div class="section-top"><h2>Team Status <span>TEAM STATUS</span></h2><span class="tiny-label">Select a card below, then choose a teammate here</span></div>
     <div class="seat-grid">${state.players.map(p=>{
       const targetable=canTarget&&p.index!==me&&!p.done;
       const active=state.turn===p.index && ['turn','feedback'].includes(state.phase);
       const bits=['seat-card', p.is_me?'my-seat':'', active?'seat-active':'',p.done?'seat-done':'',targetable?'seat-targetable':'',selectedTarget===p.index?'seat-selected':''].join(' ');
       const cards=p.hand.map(c=>`<img class="seat-smallcard ${c.visible?'face-visible':''}" src="${imageFor(c)}" alt="${c.visible?'Face-up Card':'Face-down Card'}" title="${c.public?'Face-up Card':c.visible?'Your Hand':'Hidden Card'}" />`).join('');
-      const last=state.turn_events?.slice().reverse().find(e=>e.to===p.index&&e.reaction);
+      const usedChipEvents=(state.turn_events||[]).filter(e=>e.to===p.index && (e.reaction==='positive'||e.reaction==='negative'));
+      const chipHistory=usedChipEvents.map(e=>`<span class="used-chip ${e.reaction==='positive'?'positive':'negative'}" title="Turn ${e.step}: ${e.reaction==='positive'?'Green — Needed':'Red — Not needed'}" aria-label="Turn ${e.step}: ${e.reaction==='positive'?'Green — Needed':'Red — Not needed'}">${e.reaction==='positive'?'✓':'×'}</span>`).join('');
       const chips=p.chips===null?'Preparing':`<span class="chip-value">${p.chips}</span>`;
       return `<article class="${bits}">
         <div class="seat-top">
@@ -140,9 +224,9 @@ function playerBoard(){
         </div>
         <div class="seat-facts"><span><span class="tiny-fact-label">TIME</span> ${chips}</span><span><span class="tiny-fact-label">CARDS</span> <b>${p.hand_size}</b>  cards</span></div>
         <div class="seat-hand" aria-label="${escapeHTML(p.name)} public cards and hidden hand">${cards||'<span class="empty-seat">Set complete · No cards left</span>'}</div>
+        <div class="seat-chip-history" aria-label="${escapeHTML(p.name)} Time Chip reactions, oldest to newest"><span class="chip-history-label">USED CHIPS</span><div class="used-chip-list">${chipHistory||'<span class="chip-history-empty">None yet</span>'}</div></div>
         <div class="seat-footer">
-          <span class="seat-last">${last?`Last received #${last.step} ${reactionToken(last.reaction)}`:'No received cards yet'}</span>
-          ${targetable?`<button class="seat-send" data-target="${p.index}">${selectedTarget===p.index?'✓ Recipient':'Pass to this player →'}</button>`:`<button class="seat-history" data-journal="${p.index}">${journalPerson===String(p.index)?'History Selected':'Received History ↗'}</button>`}
+          ${targetable?(selectedTarget===p.index?`<button class="seat-send seat-confirm-pass" data-do="pass" title="Confirm card transfer to ${escapeHTML(p.name)}">Pass Card →</button>`:`<button class="seat-send" data-target="${p.index}">Select Recipient →</button>`):!historyVisible?`<span class="seat-hint">${p.done?'Set completed':'Check teammates’ reactions'}</span>`:`<button class="seat-history" data-journal="${p.index}">Received History ↗</button>`}
         </div>
       </article>`;
     }).join('')}</div>
@@ -187,10 +271,11 @@ function aiTurnActionPanel(){
  </section>`;
 }
 function journalPanel(){
+ if(!historyVisible) return `<section class="history-locked"><div><span class="history-lock-icon">⌁</span><strong>Deduction History</strong><small>Hidden for the original memory-based experience.</small></div><button type="button" class="history-unlock" data-history-toggle="show">${historyUnlocked?'Show History':'Unlock History'}</button></section>`;
  const ev=state.turn_events||[];
  const selected=journalPerson==='all'?ev:ev.filter(e=>e.to===Number(journalPerson));
  const chronological=selected.slice().reverse();
- return `<aside class="journal-panel" aria-label="Deduction History"><div class="journal-top"><div><h2>Deduction History</h2><span>DEDUCTION HISTORY · ${ev.length} events</span></div><span class="history-symbol">⌕</span></div>
+ return `<aside class="journal-panel" aria-label="Deduction History"><div class="journal-top"><div><h2>Deduction History</h2><span>DEDUCTION HISTORY · ${ev.length} events</span></div><button type="button" class="history-hide" data-history-toggle="hide">Hide ↗</button></div>
    <div class="journal-filters" role="group" aria-label="Filter received cards">
      <button data-journal="all" class="${journalPerson==='all'?'active':''}">All</button>
      ${state.players.filter(p=>p.char!==null).map(p=>`<button data-journal="${p.index}" class="${journalPerson===String(p.index)?'active':''}">${escapeHTML(p.symbol)} ${escapeHTML(p.name)}</button>`).join('')}
@@ -212,7 +297,7 @@ function playerHandDock(){
  const reveal=state.phase==='reveal'&&!p.revealed&&!readOnly;
  const choosing=isMyTurn||reveal;
  let instruction='Review your cards';
- if(state.phase==='turn')instruction=isMyTurn?'① Choose a card → ② Choose a recipient → ③ Pass':'Another player is taking their turn';
+ if(state.phase==='turn')instruction=isMyTurn?'① Select a card → ② Select teammate in Team Status → ③ Confirm there':'Another player is taking their turn';
  if(state.phase==='characters')instruction='Review your hand and choose a character';
  if(state.phase==='reveal')instruction=p.revealed?'Waiting for other players to reveal their cards':'Choose 1 card to reveal';
  if(state.phase==='feedback')instruction=state.pending?.to===state.me?'Respond to the received card':'Waiting for the recipient’s reaction';
@@ -234,7 +319,7 @@ function playerHandDock(){
  } else if(state.phase==='feedback'&&state.pending?.to===state.me&&!readOnly){
    actions=`<div class="feedback-actions"><button class="feedback-button green" data-feedback="true"><span>✓</span><b>Green Chip</b><small>Needed</small></button><button class="feedback-button red" data-feedback="false"><span>×</span><b>Red Chip</b><small>Not Needed</small></button></div>`;
  } else if(isMyTurn){
-   actions=`<div class="selected-destination">${selectedCard?`Selected card: <b>${escapeHTML(selectedCard==='start'?'Starting Card':selectedCard)}</b>`:'Select a card'}<br>${selectedTarget!==null?`Recipient: <b>${escapeHTML(state.players[selectedTarget].name)}</b>`:'Select the receiving player above'}</div><button class="btn primary dock-button" data-do="pass" ${selectedCard&&selectedTarget!==null?'':'disabled'}>Pass Card →</button>`;
+   actions=`<div class="selected-destination">${selectedCard?`Selected: <b>${escapeHTML(selectedCard==='start'?'Starting Card':selectedCard)}</b>`:'Select a card'}<br>${selectedTarget!==null?`Recipient: <b>${escapeHTML(state.players[selectedTarget].name)}</b><br>Confirm in Team Status above.`:'Then select a teammate in Team Status above.'}</div>`;
  } else if(state.phase==='ended'){
    const success=state.result==='success';
    actions=state.is_owner?`<button class="btn primary dock-button" data-do="${success&&state.mission<5?'next':'retry'}">${success&&state.mission<5?'Next Seoul Mission →':success?'Play Mission Again':'Retry Mission →'}</button>`:`<span class="dock-wait">Waiting for the host to continue.</span>`;
@@ -268,23 +353,29 @@ function overlayPanel(){
  }
  return `<div class="modal-shade" data-backdrop="true"><section class="modal-dialog" role="dialog" aria-modal="true" aria-label="${overlay==='mission'?'Mission Card':overlay==='leave'?'Leave Game':'Game Rules'}"><header class="modal-header"><div><span class="eyebrow">S.O.R.T. 5</span><h2>${overlay==='mission'?`SEOUL #${n}`:overlay==='leave'?'Leave Game':'Game Rules'}</h2></div><button class="modal-close" data-overlay="close" aria-label="Close">✕</button></header>${content}</section></div>`;
 }
+function historyWarningModal(){
+ return `<div class="modal-shade history-warning-shade" role="presentation"><section class="history-warning" role="dialog" aria-modal="true" aria-label="Unlock Deduction History"><h2>Unlock Deduction History?</h2><p>SORT 5 is designed around remembering card exchanges and reading other players’ reactions. Showing previous turns will make the game easier.</p><strong>Would you like to see the history?</strong><div class="history-warning-actions"><button type="button" class="btn ghost" data-history-warning="cancel">Keep Hidden</button><button type="button" class="btn primary" data-history-warning="confirm">Show History</button></div></section></div>`;
+}
 function render(){
  if(!state){welcome();return;}
  const journalScroll=document.getElementById('journal-scroll');
  const scrollY=journalScroll?journalScroll.scrollTop:0;
  if(journalPerson!=='all' && (!state.players[Number(journalPerson)]))journalPerson='all';
- app.innerHTML=`<main class="main game-main">${topBar()}${errorText?`<div class="alert" role="alert">${escapeHTML(errorText)}</div>`:''}${missionRibbon()}
+ app.innerHTML=`<main class="main game-main phase-${state.phase}">${topBar()}${errorText?`<div class="alert" role="alert">${escapeHTML(errorText)}</div>`:''}${missionRibbon()}
    ${state.inspect!==null?'<div class="inspect-banner">TEST MODE · Viewing another player’s screen. Controls are disabled.</div>':''}
-   <div class="play-grid"><div class="board-column">${playerBoard()}${currentStage()}</div><div class="journal-column">${aiTurnActionPanel()}${journalPanel()}</div></div>${playerHandDock()}
-   <footer class="foot">SORT 5 · SEOUL PLAYTEST v0.8 · Private hands are kept separate by the server.</footer>
-   ${overlayPanel()}</main>`;
+   <div class="play-grid"><div class="board-column">${playerBoard()}${currentStage()}${playerHandDock()}</div><div class="journal-column">${missionCardPanel()}${aiTurnActionPanel()}${journalPanel()}</div></div>
+   <footer class="foot">SORT 5 · SEOUL LOCAL PLAYTEST v2.1 · Private hands are kept separate by the server.</footer>
+   ${overlayPanel()}${historyWarningOpen?historyWarningModal():''}</main>`;
  if(journalScroll && document.getElementById('journal-scroll'))document.getElementById('journal-scroll').scrollTop=scrollY;
  document.querySelectorAll('[data-card]').forEach(b=>b.addEventListener('click',()=>{selectedCard=b.dataset.card;selectedTarget=null;render();}));
  document.querySelectorAll('[data-target]').forEach(b=>b.addEventListener('click',()=>{selectedTarget=Number(b.dataset.target);render();}));
  document.querySelectorAll('[data-char]').forEach(b=>b.addEventListener('click',()=>action('character',{character:Number(b.dataset.char)})));
  document.querySelectorAll('[data-feedback]').forEach(b=>b.addEventListener('click',()=>action('feedback',{positive:b.dataset.feedback==='true'})));
- document.querySelectorAll('[data-journal]').forEach(b=>b.addEventListener('click',()=>{journalPerson=b.dataset.journal;render();}));
+ document.querySelectorAll('[data-journal]').forEach(b=>b.addEventListener('click',()=>{if(!historyUnlocked){historyWarningOpen=true;}else{historyVisible=true;}journalPerson=b.dataset.journal;render();}));
+ document.querySelectorAll('[data-history-toggle]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.historyToggle==='hide'){historyVisible=false;}else if(historyUnlocked){historyVisible=true;}else{historyWarningOpen=true;}render();}));
+ document.querySelectorAll('[data-history-warning]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.historyWarning==='confirm'){historyUnlocked=true;historyVisible=true;}historyWarningOpen=false;render();}));
  document.querySelectorAll('[data-overlay]').forEach(b=>b.addEventListener('click',()=>{overlay=b.dataset.overlay==='close'?null:b.dataset.overlay;render();}));
+ document.querySelectorAll('[data-open-mission]').forEach(b=>b.addEventListener('click',()=>openMissionLightbox(state.mission,b.dataset.openMission)));
  document.querySelectorAll('[data-side]').forEach(b=>b.addEventListener('click',()=>{missionSide=b.dataset.side;render();}));
  document.querySelector('[data-backdrop]')?.addEventListener('click',e=>{if(e.target===e.currentTarget){overlay=null;render();}});
  document.querySelectorAll('[data-do]').forEach(b=>b.addEventListener('click',async()=>{
@@ -292,7 +383,7 @@ function render(){
    if(a==='leave'){overlay='leave';render();}
    else if(a==='confirm_leave'){
      const currentCode=credentials?.code;
-     credentials=null;state=null;overlay=null;errorText='';selectedCard=null;selectedTarget=null;journalPerson='all';lastSnapshotSignature='';
+     credentials=null;state=null;overlay=null;errorText='';selectedCard=null;selectedTarget=null;journalPerson='all';historyUnlocked=false;historyVisible=false;historyWarningOpen=false;lastSnapshotSignature='';
      sessionStorage.removeItem('sort5_credentials');
      if(currentCode)localStorage.removeItem(`sort5_debug_${currentCode}`);
      window.history.replaceState({},'',window.location.pathname);
@@ -303,7 +394,7 @@ function render(){
      const invite=`${location.origin}/?room=${state.code}`;
      try{await navigator.clipboard.writeText(invite);b.textContent='Copied ✓';}catch{window.prompt('Copy invite link',invite)}
    }else if(['begin','retry','next'].includes(a)){
-     if(a==='retry'||a==='next')journalPerson='all';
+     if(a==='retry'||a==='next'){journalPerson='all';historyUnlocked=false;historyVisible=false;historyWarningOpen=false;}
      await action(a);
    }else if(a==='reveal'&&selectedCard){await action('reveal',{card:selectedCard});}
    else if(a==='pass'&&selectedCard&&selectedTarget!==null){await action('pass',{card:selectedCard,target:selectedTarget});}
@@ -316,7 +407,7 @@ function initialize(){
    if(ownerToken)credentials={code:qRoom,token:ownerToken,debugOwner:true};
  }
  if(credentials)loadState();else render();
- document.addEventListener('keydown', e=>{if(e.key==='Escape'&&overlay){overlay=null;render();}});
+ document.addEventListener('keydown', e=>{if(e.key==='Escape'){if(historyWarningOpen){historyWarningOpen=false;render();return;}const lightbox=id('mission-lightbox');if(lightbox){lightbox.remove();return;}if(overlay){overlay=null;render();}}});
  setInterval(()=>{if(credentials&&document.visibilityState==='visible')loadState();},1500);
 }
 initialize();

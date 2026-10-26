@@ -1,0 +1,114 @@
+
+/* SORT 5 layout v2.0 — viewport-height independent.
+   No fixed/sticky hand dock or full-viewport columns. */
+#app .game-main {
+  height:auto !important;
+  min-height:0 !important;
+  overflow:visible !important;
+  padding-bottom:20px !important;
+}
+#app .game-main .play-grid {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(280px,330px) !important;
+  grid-template-rows:auto !important;
+  align-items:start !important;
+  align-content:start !important;
+  height:auto !important;
+  min-height:0 !important;
+  gap:12px !important;
+}
+#app .game-main .board-column {
+  display:flex !important;
+  flex-flow:column nowrap !important;
+  justify-content:flex-start !important;
+  align-items:stretch !important;
+  align-content:start !important;
+  gap:10px !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+}
+#app .game-main .board-column > .seat-board,
+#app .game-main .board-column > .stage-panel,
+#app .game-main .board-column > .hand-dock {
+  position:static !important;
+  flex:0 0 auto !important;
+  align-self:stretch !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  margin:0 !important;
+  transform:none !important;
+}
+#app .game-main .board-column > .hand-dock {
+  inset:auto !important;
+  width:100% !important;
+  z-index:auto !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+}
+#app .game-main .journal-column {
+  display:flex !important;
+  flex-flow:column nowrap !important;
+  justify-content:flex-start !important;
+  align-content:start !important;
+  position:static !important;
+  top:auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  align-self:start !important;
+  gap:9px !important;
+}
+#app .game-main .journal-column > .mission-card-side {
+  display:flex !important;
+  flex-direction:column !important;
+  flex:0 0 auto !important;
+  position:static !important;
+  align-self:stretch !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  margin:0 !important;
+}
+#app .game-main .mission-card-grid.mission-card-vertical {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-auto-flow:row !important;
+  gap:8px !important;
+}
+#app .game-main .mission-card-vertical .mission-card-thumb img {
+  display:block !important;
+  max-height:185px !important;
+  width:100% !important;
+  height:auto !important;
+  object-fit:contain !important;
+}
+#app .game-main .journal-column > .journal-panel {
+  position:static !important;
+  flex:0 0 auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:360px !important;
+  overflow:hidden !important;
+}
+#app .game-main .journal-column > .journal-ai-action {
+  flex:0 0 auto !important;
+}
+#app .game-main .journal-column .journal-scroll {
+  max-height:260px !important;
+  min-height:0 !important;
+  overflow-y:auto !important;
+}
+@media(max-width:950px) {
+  #app .game-main .play-grid {
+    grid-template-columns:minmax(0,1fr) !important;
+    gap:10px !important;
+  }
+  #app .game-main .mission-card-vertical .mission-card-thumb img {
+    max-height:220px !important;
+  }
+}

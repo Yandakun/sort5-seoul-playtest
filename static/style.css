@@ -264,3 +264,123 @@
 .leave-confirm p{line-height:1.6;font-size:14px;color:#c6d2d6}
 .leave-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;flex-wrap:wrap}
 @media(max-width:540px){.leave-btn{font-size:11px;padding:7px 10px}.leave-actions button{flex:1}}
+
+/* Local v1.0 — always-visible mission context; compact, independently scrollable history. */
+.game-main .journal-column{gap:8px}
+.game-main .mission-brief-side{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;padding:13px 14px 12px;border:1px solid #547078;border-radius:13px;background:linear-gradient(155deg,#24343b,#1c2a33);box-shadow:0 8px 24px #0003}
+.brief-side-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;color:#f3ddd0;font-size:12px;font-weight:750;letter-spacing:.06em}
+.brief-side-heading strong{font-size:13px;color:#f5aa85}
+.brief-side-label{font-size:9px!important;font-weight:850!important;letter-spacing:.1em!important;color:#edaa89!important;margin:5px 0 1px!important}
+.brief-side-story{font-size:11px;line-height:1.5;color:#d7e3e1;margin:0;max-height:100px;overflow-y:auto}
+.brief-side-objective,.brief-side-rule{margin:0;font-size:11px;line-height:1.42;color:#edf2eb}
+.brief-card-link{background:transparent;border:0;border-top:1px solid #425963;margin-top:6px;padding:9px 0 0;color:#bce1e2;text-align:left;font-size:11px;font-weight:750;cursor:pointer}
+.game-main .journal-column .journal-panel{min-height:150px}
+.briefing-shade{z-index:125;background:#0a1218e8;padding:16px;display:flex;align-items:center;justify-content:center}
+.briefing-dialog{display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1.05fr);gap:20px;padding:20px;background:#1d303b;border:1px solid #6a8586;border-radius:19px;max-width:1020px;width:100%;max-height:94vh;overflow-y:auto;box-shadow:0 30px 100px #000b}
+.briefing-art{display:flex;align-items:center;justify-content:center;min-height:0}
+.briefing-art img{width:100%;object-fit:contain;border-radius:8px;max-height:75vh}
+.briefing-copy{display:flex;flex-direction:column;justify-content:center;gap:11px}
+.briefing-copy h2{font-size:29px;margin:0;color:#f9f1e9}
+.briefing-story-text{font-size:14px;line-height:1.7;color:#dce4e5;margin:0}
+.briefing-objective-text,.briefing-rule-text{font-size:13px;line-height:1.55;color:#edf0ef;margin:0}
+.briefing-start{font-size:15px;min-height:51px;width:100%;margin-top:14px}
+.briefing-note{font-size:10px;color:#9fb3b8;line-height:1.4}
+@media(max-width:950px){.game-main .mission-brief-side{position:relative}.game-main .journal-column{height:auto}.brief-side-story{max-height:130px}.briefing-dialog{grid-template-columns:1fr;gap:10px;max-width:650px}.briefing-art img{max-height:30vh}}
+@media(max-width:580px){.game-main .mission-brief-side{padding:10px}.brief-side-story{max-height:78px}.briefing-dialog{padding:14px;max-height:92vh}.briefing-copy h2{font-size:23px}.briefing-story-text{font-size:12px}.briefing-art img{max-height:20vh}}
+
+/* Local v1.1 — image-first mission browsing and persistent game cards */
+.home-mission-preview{border:1px solid #506a72;border-radius:13px;background:#202f38;padding:12px;margin:6px 0 15px;display:flex;flex-direction:column;gap:9px}
+.preview-title{display:flex;align-items:center;justify-content:space-between;gap:9px;font-size:12px;color:#f2d7c6}
+.preview-title span{font-size:10px;color:#a9bdc5}
+.preview-tabs{display:flex;gap:6px}
+.preview-tabs button{flex:1;background:#2d424d;color:#d9e3e6;border:1px solid #465d67;border-radius:8px;cursor:pointer;padding:8px}
+.preview-tabs button.active{background:#e9a687;color:#1e2630;font-weight:800}
+.home-card-open{border:0;background:transparent;cursor:zoom-in;color:#d0e4e8;display:flex;flex-direction:column;gap:6px;align-items:center}
+.home-card-open img{display:block;width:min(100%,370px);height:190px;object-fit:contain;border-radius:7px}
+.home-card-open span{font-size:11px}
+.mission-card-side{flex:0 0 auto;background:linear-gradient(145deg,#253741,#1c2a34);border:1px solid #526976;border-radius:13px;padding:10px 11px;display:flex;flex-direction:column;gap:7px}
+.mission-card-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;letter-spacing:.06em;color:#f0e2d7}
+.mission-card-heading span{color:#f1ae8d;font-weight:850}
+.mission-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mission-card-thumb{background:#1b2830;border:1px solid #465864;border-radius:9px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 5px 6px;cursor:zoom-in;color:#d4e7ed;min-width:0}
+.mission-card-thumb img{display:block;width:100%;height:clamp(85px,15vh,145px);object-fit:contain;border-radius:5px}
+.mission-card-thumb span{display:flex;justify-content:space-between;width:100%;padding:1px 5px;font-size:10px}
+.mission-card-thumb:hover{border-color:#eaa88a;background:#30434d}
+.mission-objective{border-top:1px solid #425963;margin:0;padding:7px 1px 0;display:flex;flex-direction:column;gap:3px}
+.mission-objective small{color:#e5a286;font-weight:800;font-size:9px;letter-spacing:.07em}
+.mission-objective strong{font-size:11px;color:#e5eff0;font-weight:700}
+.mission-lightbox{position:fixed;inset:0;z-index:9999;background:#050d12eb;display:flex;justify-content:center;align-items:center;padding:15px;overflow:auto}
+.mission-lightbox-dialog{max-width:min(96vw,1040px);width:100%;max-height:96vh;border-radius:15px;border:1px solid #5a7380;background:#1f303a;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center;box-shadow:0 30px 85px #0009}
+.mission-lightbox-dialog header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#f4e2d3}
+.mission-lightbox-dialog header div{display:flex;align-items:center;gap:6px}
+.mission-lightbox-dialog header button{background:#34454f;color:#e9f2f3;border:1px solid #60747e;border-radius:7px;padding:8px 13px;cursor:pointer}
+.mission-lightbox-dialog header button.active{background:#edaf90;color:#1b2933;font-weight:800}
+.mission-lightbox-dialog header .lightbox-close{font-size:17px}
+.mission-lightbox-dialog>img{max-height:calc(96vh - 126px);width:100%;object-fit:contain;min-height:0}
+.mission-lightbox-dialog>p{font-size:10px;color:#adc1c9;margin:0}
+@media(max-width:950px){.mission-card-thumb img{height:150px}}
+@media(max-width:580px){.mission-card-thumb img{height:118px}.mission-card-side{padding:9px}.mission-lightbox-dialog{padding:8px}.mission-lightbox-dialog header{flex-wrap:wrap}.home-card-open img{height:170px}}
+
+/* Local v1.2: mission cards stacked, guarded history, in-place pass confirmation. */
+.game-main .mission-card-grid.mission-card-vertical {display:grid;grid-template-columns:minmax(0,1fr);gap:9px;min-height:0}
+.game-main .mission-card-vertical .mission-card-thumb {padding:5px 8px;gap:3px}
+.game-main .mission-card-vertical .mission-card-thumb img {height:auto;width:100%;max-height:none;aspect-ratio:1.72;object-fit:contain}
+.game-main .mission-card-side {flex:1 1 auto;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#60717c transparent}
+.game-main .journal-column {gap:8px}
+.game-main .journal-column .journal-panel {flex:0 1 36%;min-height:160px}
+.game-main .journal-ai-action {flex-shrink:0}
+.game-main .seat-card .seat-footer{flex-wrap:wrap;gap:5px}
+.game-main .seat-card .seat-confirm-pass {display:block;flex:1 0 100%;width:100%;border:1px solid #c8f0d7;background:#b8dbc8;color:#1a312a;font-weight:850;border-radius:8px;padding:9px 5px;cursor:pointer;font-size:12px}
+.game-main .seat-card .seat-confirm-pass:hover{background:#dbf7e5}
+.game-main .seat-card .seat-hint{font-size:9px;color:#80949e}
+.history-locked {flex:0 0 auto;background:#1c2b35;border:1px solid #4a6170;border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:9px}
+.history-locked>div{display:flex;flex-direction:column;gap:4px}
+.history-locked strong{color:#e4edf0;font-size:12px}
+.history-locked small{color:#9bb1bb;font-size:10px;line-height:1.4}
+.history-lock-icon{color:#ecb08c;font-size:14px}
+.history-unlock,.history-hide {background:#354955;color:#e4edf0;border:1px solid #607884;border-radius:7px;padding:8px 10px;font-weight:700;font-size:11px;white-space:nowrap;cursor:pointer}
+.history-warning-shade{z-index:120;display:flex;align-items:center;justify-content:center}
+.history-warning{max-width:460px;width:100%;border:1px solid #6b8390;border-radius:16px;background:#21323e;color:#e6eef1;padding:24px;box-shadow:0 30px 80px #0009}
+.history-warning h2{font-size:22px;margin:0 0 13px}
+.history-warning p{line-height:1.65;color:#b8cdd6;font-size:13px}
+.history-warning strong{display:block;font-size:13px;margin:14px 0}
+.history-warning-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;flex-wrap:wrap}
+@media(max-width:950px){.game-main .mission-card-side{max-height:600px;flex:initial}.game-main .mission-card-vertical .mission-card-thumb img{max-height:220px;aspect-ratio:auto}.game-main .journal-column .journal-panel{height:360px;flex:initial}}
+@media(max-width:580px){.game-main .mission-card-side{max-height:490px}.game-main .mission-card-vertical .mission-card-thumb img{max-height:185px}.history-locked{align-items:flex-start}.history-warning{padding:18px}}
+
+/* v1.3: confirm replaces recipient selector in the same footer slot. */
+.game-main .seat-card .seat-footer {min-width:0;flex-wrap:nowrap;align-items:center}
+.game-main .seat-card .seat-footer .seat-last{min-width:0;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto}
+.game-main .seat-card .seat-footer .seat-send{position:static;display:block;flex:0 0 auto;max-width:100%;min-width:0;width:auto;white-space:normal;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+.game-main .seat-card .seat-footer .seat-confirm-pass{position:static;display:block;flex:0 0 auto;width:auto;max-width:100%;min-width:0;margin:0;padding:7px 8px;white-space:normal;overflow-wrap:anywhere;z-index:auto}
+@media(max-width:1100px){.game-main .seat-card .seat-footer{flex-wrap:wrap}.game-main .seat-card .seat-footer .seat-last{flex:1 0 100%;width:100%}.game-main .seat-card .seat-footer .seat-send{width:100%;flex:1 1 100%}}
+
+
+/* SORT 5 v1.9 — single canonical game layout. Historic layout patches removed. */
+.game-main {max-width:1600px; height:auto; min-height:0; overflow:visible; padding:12px 18px 22px; padding-bottom:22px;}
+.game-main .brandbar {margin-bottom:8px;padding-bottom:8px}
+.game-main .mission-ribbon{margin-bottom:9px}
+.game-main .play-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,330px);align-items:start;gap:10px;height:auto;min-height:0;overflow:visible}
+.game-main .board-column{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:10px;min-width:0;height:auto;min-height:0;overflow:visible}
+.game-main .seat-board,.game-main .stage-panel{height:auto;min-height:0;flex:0 0 auto}
+.game-main .hand-dock{position:static;inset:auto;bottom:auto;left:auto;right:auto;z-index:auto;flex:0 0 auto;width:100%;height:auto;max-height:none;min-height:0;margin:0;padding:11px 13px;overflow:visible;box-shadow:none;backdrop-filter:none}
+.game-main .journal-column{position:static;inset:auto;top:auto;display:flex;flex-direction:column;justify-content:flex-start;align-self:start;gap:9px;height:auto;max-height:none;min-height:0;overflow:visible;min-width:0}
+.game-main .mission-card-side{display:flex;flex:0 0 auto;flex-direction:column;gap:8px;align-self:start;height:auto;min-height:0;max-height:none;overflow:visible;padding:10px}
+.game-main .mission-card-grid.mission-card-vertical{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-flow:row;gap:9px;height:auto;min-height:0}
+.game-main .mission-card-grid.mission-card-vertical .mission-card-thumb{width:100%;min-width:0;padding:4px 5px;box-sizing:border-box}
+.game-main .mission-card-grid.mission-card-vertical .mission-card-thumb img{display:block;width:100%;height:auto;max-height:185px;aspect-ratio:auto;object-fit:contain}
+.game-main .journal-column .journal-panel{position:static;inset:auto;top:auto;display:flex;flex-direction:column;flex:0 0 auto;height:auto;min-height:0;max-height:360px;overflow:hidden;padding:12px}
+.game-main .journal-ai-action{flex:0 0 auto}
+.game-main .journal-scroll{flex:1 1 auto;min-height:0;max-height:240px;overflow-y:auto}
+.game-main .foot{display:none}
+/* Team status stays compact; the hand starts immediately after the current-turn panel. */
+@media(min-width:1100px){.game-main .seat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:950px){
+ .game-main{padding:12px}
+ .game-main .play-grid{grid-template-columns:minmax(0,1fr)}
+ .game-main .board-column{gap:9px}
+ .game-main .journal-column{height:auto;min-height:0}
+ .game-main .hand-dock{position:static;margin:0;width:100%}
+ .game-main .mission-card-grid.mission-card-vertical{grid-template-columns:minmax(0,1fr)}
+ .game-main .mission-card-grid.mission-card-vertical .mission-card-thumb img{max-height:220px}
+}

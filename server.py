@@ -643,11 +643,14 @@ def health():
 
 @APP.post("/api/new")
 def create(body: CreateBody):
+    # Inspection can reveal every player's private hand. Keep it off for publicly
+    # distributed rooms; a trusted local developer can opt in explicitly.
+    allow_debug = os.getenv("SORT5_ALLOW_DEBUG", "").lower() in ("1", "true", "yes")
     with ROOMS_LOCK:
         token = secrets.token_urlsafe(24)
         for _ in range(100):
             code = new_code()
-            room = Room(code=code, humans=body.humans, mission=body.mission, debug=body.debug,
+            room = Room(code=code, humans=body.humans, mission=body.mission, debug=(body.debug and allow_debug),
                         players=[Player(name=body.name.strip(), token=token)], owner=token)
             if save_room(room, new=True):
                 return {"code": code, "token": token}

@@ -1,0 +1,15 @@
+/* SORT 5 v2.1 — resilient mission selector and publicly observed chip reactions */
+.mission-pick-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:100%}
+.mission-pick{border:1px solid #526674;border-radius:8px;background:#233544;color:#dbe7e8;padding:11px 4px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap}
+.mission-pick:hover,.mission-pick:focus-visible{border-color:#f1b69a;background:#354d5b;outline:2px solid #a97b70;outline-offset:1px}
+.mission-pick.active{color:#1f2830;background:#f09c84;border-color:#f09c84}
+.seat-chip-history{border-top:1px solid #34434b;padding-top:6px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.chip-history-label{font-size:9px;font-weight:800;letter-spacing:1px;color:#98acb5}
+.used-chip-list{display:flex;gap:4px;align-items:center;flex-wrap:wrap;min-height:22px;max-height:72px;overflow-y:auto;scrollbar-width:thin}
+.used-chip{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;flex:none;border:2px solid;border-radius:50%;font-weight:900;font-size:13px;line-height:1}
+.used-chip.positive{background:#bfe0ac;color:#1d5638;border-color:#517a53}
+.used-chip.negative{background:#e7a5a3;color:#76303b;border-color:#a35259}
+.chip-history-empty{font-size:10px;color:#899ba4}
+.seat-card{gap:6px}
+.seat-footer{margin-top:auto}
+@media(max-width:600px){.mission-pick{padding:9px 0;font-size:12px}.used-chip{width:19px;height:19px;font-size:11px}.used-chip-list{gap:3px}}
