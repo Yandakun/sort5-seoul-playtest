@@ -112,8 +112,8 @@ ROOMS_LOCK = threading.RLock()
 
 # Shared persistence for Vercel. The local development server keeps using memory
 # when no Redis configuration is present. Vercel requires the shared store.
-REDIS_URL = os.getenv("UPSTASH_REDIS_REST_URL", "").rstrip("/")
-REDIS_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+REDIS_URL = (os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("KV_REST_API_URL") or "").rstrip("/")
+REDIS_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or os.getenv("KV_REST_API_TOKEN") or ""
 REMOTE_STORE = bool(REDIS_URL and REDIS_TOKEN)
 ROOM_TTL_SECONDS = 60 * 60 * 24  # inactive test rooms expire after one day
 
