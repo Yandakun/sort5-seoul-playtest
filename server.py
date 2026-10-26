@@ -11,6 +11,13 @@ import random
 import secrets
 import string
 import threading
+import os
+import json
+import time
+import urllib.request
+import urllib.error
+from contextlib import contextmanager
+from dataclasses import asdict
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -103,10 +110,117 @@ class Room:
 ROOMS: dict[str, Room] = {}
 ROOMS_LOCK = threading.RLock()
 
+# Shared persistence for Vercel. The local development server keeps using memory
+# when no Redis configuration is present. Vercel requires the shared store.
+REDIS_URL = os.getenv("UPSTASH_REDIS_REST_URL", "").rstrip("/")
+REDIS_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+REMOTE_STORE = bool(REDIS_URL and REDIS_TOKEN)
+ROOM_TTL_SECONDS = 60 * 60 * 24  # inactive test rooms expire after one day
+
+
+def redis_command(*args):
+    if not REMOTE_STORE:
+        raise RuntimeError("Upstash Redis has not been configured")
+    req = urllib.request.Request(
+        REDIS_URL,
+        data=json.dumps(list(args), ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+        headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=9) as response:
+            result = json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        raise HTTPException(503, "Shared room storage temporarily unavailable") from exc
+    if "error" in result:
+        raise HTTPException(503, "Shared room storage error")
+    return result.get("result")
+
+
+def room_key(code: str) -> str:
+    return f"sort5:room:{code.strip().upper()}"
+
+
+def room_to_json(room: Room) -> str:
+    fields = dict(vars(room))
+    fields.pop("lock", None)
+    fields["public"] = sorted(room.public)
+    fields["players"] = [asdict(p) for p in room.players]
+    return json.dumps(fields, separators=(",", ":"), ensure_ascii=False)
+
+
+def room_from_json(value: str) -> Room:
+    data = json.loads(value)
+    data["players"] = [Player(**p) for p in data["players"]]
+    data["public"] = set(data["public"])
+    return Room(**data)
+
+
+def get_room(code: str) -> Optional[Room]:
+    code = code.strip().upper()
+    if REMOTE_STORE:
+        value = redis_command("GET", room_key(code))
+        return room_from_json(value) if value is not None else None
+    if os.getenv("VERCEL"):
+        raise HTTPException(503, "Connect Upstash Redis to this Vercel project and redeploy")
+    return ROOMS.get(code)
+
+
+def save_room(room: Room, *, new: bool = False) -> bool:
+    if REMOTE_STORE:
+        args = ["SET", room_key(room.code), room_to_json(room), "EX", ROOM_TTL_SECONDS]
+        if new:
+            args.append("NX")
+        return redis_command(*args) == "OK"
+    if os.getenv("VERCEL"):
+        raise HTTPException(503, "Connect Upstash Redis to this Vercel project and redeploy")
+    if new and room.code in ROOMS:
+        return False
+    ROOMS[room.code] = room
+    return True
+
+
+@contextmanager
+def exclusive_room(code: str):
+    """Serialize mutations across serverless instances to avoid lost updates."""
+    code = code.strip().upper()
+    if not REMOTE_STORE:
+        room = get_room(code)
+        if room is None:
+            raise HTTPException(404, "Room not found")
+        with room.lock:
+            yield
+        return
+
+    # The lease bounds stale-lock recovery if an instance is interrupted.
+    # Lock TTL is 20 seconds; each game action is expected to finish well before.
+    key = f"sort5:lock:{code}"
+    owner = secrets.token_urlsafe(18)
+    acquired = False
+    for attempt in range(20):
+        if redis_command("SET", key, owner, "NX", "EX", 20) == "OK":
+            acquired = True
+            break
+        time.sleep(0.10)
+    if not acquired:
+        raise HTTPException(409, "Room is busy. Try again in a moment.")
+    try:
+        yield
+    finally:
+        # Release only the lock this request owns.
+        try:
+            redis_command(
+                "EVAL",
+                "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+                1, key, owner,
+            )
+        except HTTPException:
+            pass
+
 def new_code() -> str:
     for _ in range(100):
         code = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-        if code not in ROOMS:
+        if get_room(code) is None:
             return code
     raise RuntimeError("Unable to allocate room")
 
@@ -137,7 +251,7 @@ def append_history(room: Room, msg: str):
         room.history = room.history[-120:]
 
 def room_and_player(code: str, token: str):
-    room = ROOMS.get(code.strip().upper())
+    room = get_room(code.strip().upper())
     if room is None:
         raise HTTPException(404, "Room not found")
     for i, p in enumerate(room.players):
@@ -525,25 +639,27 @@ def index():
 
 @APP.get("/health")
 def health():
-    return {"ok": True, "rooms": len(ROOMS)}
+    return {"ok": True, "storage": "upstash" if REMOTE_STORE else ("unconfigured" if os.getenv("VERCEL") else "local"), "rooms_local": len(ROOMS) if not REMOTE_STORE else None}
 
 @APP.post("/api/new")
 def create(body: CreateBody):
     with ROOMS_LOCK:
-        code = new_code()
         token = secrets.token_urlsafe(24)
-        room = Room(code=code, humans=body.humans, mission=body.mission, debug=body.debug,
-                    players=[Player(name=body.name.strip(), token=token)], owner=token)
-        ROOMS[code] = room
-    return {"code": code, "token": token}
+        for _ in range(100):
+            code = new_code()
+            room = Room(code=code, humans=body.humans, mission=body.mission, debug=body.debug,
+                        players=[Player(name=body.name.strip(), token=token)], owner=token)
+            if save_room(room, new=True):
+                return {"code": code, "token": token}
+    raise HTTPException(503, "Unable to allocate game room")
 
 @APP.post("/api/join")
 def join(body: JoinBody):
     code = body.code.strip().upper()
-    room = ROOMS.get(code)
-    if not room:
-        raise HTTPException(404, "Room not found")
-    with room.lock:
+    with exclusive_room(code):
+        room = get_room(code)
+        if room is None:
+            raise HTTPException(404, "Room not found")
         if room.phase != "lobby" or len(room.players) >= room.humans:
             raise HTTPException(409, "This room cannot accept more players")
         name = body.name.strip()
@@ -551,18 +667,18 @@ def join(body: JoinBody):
             raise HTTPException(409, "This nickname is already in use")
         token = secrets.token_urlsafe(24)
         room.players.append(Player(name=name, token=token))
+        save_room(room)
     return {"code": code, "token": token}
 
 @APP.get("/api/state")
 def state(code: str = Query(...), token: str = Query(...), inspect: Optional[int] = Query(default=None, ge=0, le=3)):
     room, i = room_and_player(code, token)
-    with room.lock:
-        return snapshot(room, i, inspect)
+    return snapshot(room, i, inspect)
 
 @APP.post("/api/action")
 def action(body: ActionBody):
-    room, i = room_and_player(body.code, body.token)
-    with room.lock:
+    with exclusive_room(body.code):
+        room, i = room_and_player(body.code, body.token)
         p = room.players[i]
         try:
             if body.type == "begin":
@@ -627,6 +743,7 @@ def action(body: ActionBody):
                 raise ValueError("Unknown action")
         except ValueError as e:
             raise HTTPException(400, str(e))
+        save_room(room)
         return snapshot(room, i)
 
 
