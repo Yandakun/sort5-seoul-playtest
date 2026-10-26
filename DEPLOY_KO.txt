@@ -1,0 +1,16 @@
+SORT 5 SEOUL v0.8 Vercel 배포
+
+1. Node.js 설치 확인: node -v
+2. 터미널에서 이 폴더로 이동: cd [폴더경로]
+3. npx vercel login
+4. npx vercel
+   - Set up and deploy? Yes
+   - Scope: 본인 계정
+   - Link to existing project? No
+   - Project name: sort5-seoul-playtest (원하는 이름)
+   - Code directory: ./
+   - 기존 설정 변경 질문: No
+5. 시험 주소에서 홈이 열리는지 테스트
+6. npx vercel --prod
+
+주의: 현재 서버는 게임방을 Python 메모리에 저장합니다. Vercel에서는 함수 인스턴스가 바뀌면 방이 사라질 수 있으므로 지속적인 플레이나 여러 명의 멀티플레이를 보장할 수 없습니다. 안정적 서비스를 위해 Redis 등 공유 저장소를 사용하도록 백엔드 변경이 필요합니다.
