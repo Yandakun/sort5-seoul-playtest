@@ -1,0 +1,11 @@
+/* Special action layout for New York #02 and London #04 */
+.special-step {margin:12px 0 2px;padding:14px;border:1px solid #536b7b;border-radius:12px;background:#152832;color:#f5f6f8}
+.special-step strong{display:block;font-size:14px;margin-bottom:6px}
+.special-step p{font-size:13px;line-height:1.55;color:#c7d1db;margin:7px 0}
+.special-ready{font-size:12px;color:#e6b77f;margin:10px 0}
+.special-step .btn{min-height:42px;padding:8px 15px;margin-top:9px}
+.guess-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:12px 0 2px}
+.guess-options button{min-height:44px;border:1px solid #8b9faf;border-radius:8px;background:#263e4e;color:#fff;font-weight:800;cursor:pointer;font-size:17px}
+.guess-options button:hover,.guess-options button:focus-visible{background:#ed907a;color:#1c242c}
+
+.shared-chip-counter{margin-left:12px;display:inline-block;color:#e6b77f;font-size:12px;font-weight:700}

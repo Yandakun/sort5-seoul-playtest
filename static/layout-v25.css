@@ -1,0 +1,27 @@
+/* v2.5 stable four-seat table; overrides legacy row layouts. */
+#app .game-main .table-seat-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.14fr) minmax(0,1fr)!important;grid-template-rows:auto auto auto;grid-template-areas:". north ." "west center east" ". south .";align-items:stretch;gap:9px;max-width:900px;margin:0 auto;width:100%;}
+#app .game-main .table-seat-grid>.table-seat-north{grid-area:north}
+#app .game-main .table-seat-grid>.table-seat-south{grid-area:south}
+#app .game-main .table-seat-grid>.table-seat-west{grid-area:west}
+#app .game-main .table-seat-grid>.table-seat-east{grid-area:east}
+#app .game-main .table-seat-grid>.table-center{grid-area:center;align-self:stretch;min-height:145px;border:1px solid #425b61;border-radius:20px;background:radial-gradient(circle at 50% 30%,#334b52,#192c35);display:flex;flex-flow:column;justify-content:center;align-items:center;color:#e4d8c2;font-weight:800;letter-spacing:.14em;text-align:center}
+#app .game-main .table-center small{font-size:10px;color:#8fa3a4;margin-top:10px}
+#app .game-main .table-seat-grid .seat-card{min-width:0;width:100%;padding:9px;gap:5px;align-self:stretch}
+#app .game-main .table-seat-grid .seat-card .seat-footer{margin-top:auto;min-width:0;display:flex}
+#app .game-main .table-seat-grid .seat-card .seat-send{width:100%!important;flex:1 1 100%!important;min-width:0;white-space:normal}
+#app .game-main .table-seat-grid .seat-card .seat-hand{height:37px}
+#app .game-main .table-seat-grid .seat-card .seat-smallcard{height:33px;max-width:28px}
+#app .game-main .table-seat-grid .seat-card .seat-avatar{width:38px;height:38px}
+#app .game-main .table-seat-grid .seat-card .seat-name{font-size:11px}
+#app .game-main .table-seat-grid .seat-card .seat-facts{font-size:10px;gap:6px;flex-wrap:wrap}
+#app .game-main .table-seat-grid .seat-card.seat-done{opacity:.72}
+@media(max-width:750px){
+ #app .game-main .table-seat-grid{gap:5px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important}
+ #app .game-main .table-seat-grid>.table-center{min-height:110px;border-radius:12px;font-size:11px}
+ #app .game-main .table-seat-grid .seat-card{padding:5px!important}
+ #app .game-main .table-seat-grid .seat-card .seat-name{font-size:10px}
+ #app .game-main .table-seat-grid .seat-card .seat-hand{height:25px}
+ #app .game-main .table-seat-grid .seat-card .seat-smallcard{height:23px;max-width:19px}
+ #app .game-main .table-seat-grid .seat-card .seat-avatar{width:29px;height:29px}
+ #app .game-main .table-seat-grid .seat-card .tiny-fact-label{display:none}
+}

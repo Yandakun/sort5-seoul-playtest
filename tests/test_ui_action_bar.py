@@ -27,5 +27,5 @@ def test_sidebar_position_above_history_and_remains_visible():
 
 
 def test_cache_busting():
-    assert 'style.css?v=22' in HTML
-    assert 'app.js?v=22' in HTML
+    assert 'style.css?v=42' in HTML
+    assert 'app.js?v=42' in HTML

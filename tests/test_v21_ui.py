@@ -16,4 +16,4 @@ def test_chip_history_is_public_feedback_only():
     assert 'chipHistory' in APP
 
 def test_cache_version_updated():
-    assert 'layout-v21.css?v=22' in HTML
+    assert 'layout-v21.css?v=42' in HTML

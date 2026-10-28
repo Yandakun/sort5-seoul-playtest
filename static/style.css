@@ -384,3 +384,12 @@
  .game-main .mission-card-grid.mission-card-vertical{grid-template-columns:minmax(0,1fr)}
  .game-main .mission-card-grid.mission-card-vertical .mission-card-thumb img{max-height:220px}
 }
+
+/* Two-card offer controls */
+.offer-choice-panel{padding:12px;border:1px solid #5c7180;border-radius:12px;margin-top:12px;background:#1c2b35}
+.offer-choice-panel p{font-size:13px;color:#c6d0d6}
+.offer-options{display:flex;gap:12px;align-items:stretch;margin-top:10px}
+.offer-option{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:100px;padding:10px;background:#29404c;border:1px solid #6b8b97;border-radius:9px;color:white;cursor:pointer}
+.offer-option:hover{border-color:#ef967e}
+.offer-option img{width:72px;max-height:110px;object-fit:contain}
+.hand-item.picked{outline:3px solid #ef967e;outline-offset:2px}
