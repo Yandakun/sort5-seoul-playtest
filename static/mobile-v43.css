@@ -75,3 +75,11 @@
   color: #2c2316;
   border-radius: 4px;
 }
+
+/* v4.8 Berlin #05 public, temporary count announcement */
+.berlin-count-banner { position:fixed; z-index:2000; top:15%; left:50%; transform:translateX(-50%); width:min(90vw,440px); padding:22px 30px; border:2px solid #d8b77a; border-radius:18px; background:#162731; color:#f7f4ea; text-align:center; box-shadow:0 12px 46px #0009; pointer-events:none; display:flex; flex-direction:column; gap:12px; }
+.berlin-count-banner > span,.berlin-count-banner small { color:#d4dfe1; font-size:13px; }
+.berlin-count-banner strong { font-size:23px; }
+.berlin-count-banner strong b { font-size:58px; display:block; color:#ffdc93; line-height:1.2; }
+.berlin-announce-confirm {text-align:center}
+.berlin-declared-count {font-size:56px;display:block;line-height:1.3;color:#ffdc93}

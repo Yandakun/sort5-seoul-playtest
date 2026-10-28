@@ -14,6 +14,9 @@ let errorText = '';
 let polling = false;
 let actionBusy = false;
 let journalPerson = 'all';
+let lastAnnouncementSeen = '';
+let announcementVisibleUntil = 0;
+let announcementTimer = null;
 let historyUnlocked = false;
 let historyVisible = false;
 let historyWarningOpen = false;
@@ -279,6 +282,30 @@ function guessNumberPanel(){
   if(!recipient)return `<div class="special-step"><strong>Number Guess — London #04</strong><p>Waiting for ${escapeHTML(state.players[state.pending?.to]?.name||'the recipient')} to guess the number before viewing the card.</p></div>`;
   return `<div class="special-step"><strong>Guess the Number — London #04</strong><p>A card was sent to you. Choose its number <b>before looking at it</b>. A wrong guess costs one additional shared Time Chip.</p><div class="guess-options">${[1,2,3,4,5].map(n=>`<button type="button" data-guess="${n}">${n}</button>`).join('')}</div></div>`;
 }
+function announcementBanner(){
+ if(currentCity()!=='berlin' || state.mission!==5)return '';
+ const events=state.turn_events||[];
+ const recent=[...events].reverse().find(e=>e.announced_count!==undefined && e.announced_at);
+ if(!recent)return '';
+ const key=`${state.code}:${currentCity()}:${state.mission}:${recent.step}:${recent.announced_at}`;
+ if(lastAnnouncementSeen!==key){
+   lastAnnouncementSeen=key;
+   // Server timestamp prevents older declarations reappearing after refresh/rejoin.
+   announcementVisibleUntil=Math.min(Date.now()+3000, recent.announced_at*1000+5000);
+   if(announcementTimer)clearTimeout(announcementTimer);
+   const delay=announcementVisibleUntil-Date.now();
+   if(delay>0)announcementTimer=setTimeout(()=>{announcementTimer=null;render();},delay+50);
+ }
+ if(Date.now()>=announcementVisibleUntil)return '';
+ const recipient=state.players[recent.to];
+ return `<aside class="berlin-count-banner" role="status" aria-live="assertive"><span>BERLIN #05 · ANNOUNCEMENT</span><strong>${escapeHTML(recipient?.name||'Recipient')} declares <b>${recent.announced_count}</b></strong><small>Cards of the received color · Red Chip</small></aside>`;
+}
+function countAnnouncementPanel(){
+ if(currentCity()!=='berlin'||state.mission!==5||state.phase!=='announce')return '';
+ const mine=state.pending?.to===state.me && state.inspect===null;
+ if(!mine)return `<div class="special-step"><strong>Color Count Announcement</strong><p>Waiting for the recipient to announce the number of cards.</p></div>`;
+ return `<div class="special-step berlin-announce-confirm"><strong>Declare Your Card Count</strong><p>Including the card you just received, you now hold this many cards of that color:</p><strong class="berlin-declared-count">${state.announcement_count}</strong><p>Everyone will hear the number, but not the color. You must use a red chip.</p><button class="btn primary" type="button" data-do="announce">Announce ${state.announcement_count} →</button></div>`;
+}
 function currentStage(){
   const events=state.turn_events||[];
   const recent=events.length?events[events.length-1]:null;
@@ -292,6 +319,7 @@ function currentStage(){
   else if(phase==='initial_pass') summary='Each player chooses one hidden card to pass right simultaneously.';
   else if(phase==='guess') summary='Recipient guesses the card number before seeing the card.';
   else if(phase==='offer_choice') summary='Waiting for the recipient to select 1 of 2 offered cards.';
+  else if(phase==='announce') summary=`Waiting for ${escapeHTML(state.players[state.pending?.to]?.name||'recipient')} to announce their count.`;
   else if(phase==='feedback') summary=`Waiting for ${escapeHTML(state.players[state.pending?.to]?.name||'recipient')} to show a Time Chip.`;
   else if(actor) summary=`It is ${playerLabel(actor)}${actor.bot?' (AI)':''}'s turn.`;
   const recentMarkup=recent?(()=>{
@@ -303,7 +331,7 @@ function currentStage(){
        <div class="transfer-response"><span class="tiny-fact-label">Recipient Reaction</span>${reactionToken(recent.reaction,true)}${recent.announced_count!==undefined?`<small>Declared: ${recent.announced_count} cards of the received color</small>`:''}${recent.guessed_number?`<small>Guessed ${recent.guessed_number} · ${recent.guess_wrong?'Wrong (+1 chip)':'Correct'}</small>`:''}</div></div>`;
   })():`<div class="stage-empty"><div class="stage-start">▲</div><div><b>Before the First Pass</b><p>The ▲ character holding the Starting Card takes the first turn.</p></div></div>`;
   return `<section class="stage-panel" aria-live="polite"><div class="section-top"><h2>Live Turn <span>LIVE TURN</span></h2><span class="turn-counter">Passes ${state.moves}${recent?` · #${recent.step}`:''}</span></div>
-    <div class="stage-content"><div class="stage-context"><span class="stage-context-dot"></span><strong>${summary}</strong></div>${recentMarkup}${offerChoicePanel()}${initialPassPanel()}${guessNumberPanel()}</div>
+    <div class="stage-content"><div class="stage-context"><span class="stage-context-dot"></span><strong>${summary}</strong></div>${recentMarkup}${offerChoicePanel()}${initialPassPanel()}${guessNumberPanel()}${countAnnouncementPanel()}</div>
     ${phase==='feedback' && state.pending?.to===state.me && state.inspect===null?'<div class="stage-hint">Choose a green or red Time Chip in Your Hand below.</div>':''}
     ${phase==='turn' && actor && !actor.bot && actor.index!==state.me?'<div class="stage-hint">The card pass will appear here when that player takes their turn.</div>':''}
     ${phase==='ended'?`<div class="stage-result ${state.result==='success'?'win':'lose'}">${escapeHTML(state.reason)}</div>`:''}
@@ -354,6 +382,7 @@ function playerHandDock(){
  if(state.phase==='guess')instruction=state.pending?.to===state.me?'Guess the number in Live Turn before viewing the card':'Waiting for the recipient’s guess';
  if(state.phase==='characters')instruction=state.rules?.includes('sets aside')||state.rules?.includes('holds card')?'Choose a character before the cards are dealt. The ▲ character will set aside one unseen card.':'Review your hand and choose a character';
  if(state.phase==='reveal')instruction=p.revealed?'Waiting for other players to reveal their cards':'Choose 1 card to reveal';
+ if(state.phase==='announce')instruction=state.pending?.to===state.me?'Announce the number of matching-color cards':'Waiting for the recipient to announce';
  if(state.phase==='feedback')instruction=state.pending?.to===state.me?'Respond to the received card':'Waiting for the recipient’s reaction';
  if(state.phase==='ended')instruction='Mission Result';
  const hand=p.hand.map(c=>{
@@ -377,6 +406,8 @@ function playerHandDock(){
    actions='<span class="dock-wait">The receiving player must guess the number before looking.</span>';
  } else if(state.phase==='offer_choice' && state.offer?.to===state.me && !readOnly){
    actions='<span class="dock-wait">Choose one of the offered cards in the Live Turn panel.</span>';
+ } else if(state.phase==='announce'){
+   actions='<span class="dock-wait">Use the Announce button in Live Turn. Red Chip is mandatory.</span>';
  } else if(state.phase==='feedback'&&state.pending?.to===state.me&&!readOnly){
    actions=`<div class="feedback-actions"><button class="feedback-button green" data-feedback="true"><span>✓</span><b>Green Chip</b><small>Needed</small></button><button class="feedback-button red" data-feedback="false"><span>×</span><b>Red Chip</b><small>Not Needed</small></button></div>`;
  } else if(isMyTurn){
@@ -427,7 +458,7 @@ function render(){
  const journalScroll=document.getElementById('journal-scroll');
  const scrollY=journalScroll?journalScroll.scrollTop:0;
  if(journalPerson!=='all' && (!state.players[Number(journalPerson)]))journalPerson='all';
- app.innerHTML=`<main class="main game-main phase-${state.phase}">${topBar()}${errorText?`<div class="alert" role="alert">${escapeHTML(errorText)}</div>`:''}${missionRibbon()}
+ app.innerHTML=`<main class="main game-main phase-${state.phase}">${topBar()}${errorText?`<div class="alert" role="alert">${escapeHTML(errorText)}</div>`:''}${missionRibbon()}${announcementBanner()}
    ${state.inspect!==null?'<div class="inspect-banner">TEST MODE · Viewing another player’s screen. Controls are disabled.</div>':''}
    <div class="mobile-ai-turn-bar">${aiTurnActionPanel()}</div>
    <div class="play-grid"><div class="board-column">${playerBoard()}${currentStage()}${playerHandDock()}</div><div class="journal-column">${missionCardPanel()}<div class="desktop-ai-turn">${aiTurnActionPanel()}</div>${journalPanel()}</div></div>
@@ -470,6 +501,7 @@ function render(){
      render();
    }
    else if(a==='advance_ai'){await action('advance_ai');}
+   else if(a==='announce'){await action('announce');}
    else if(a==='initial_pass'&&selectedCard){await action('initial_pass',{card:selectedCard});}
    else if(a==='copy'){
      const invite=`${location.origin}/?room=${state.code}`;

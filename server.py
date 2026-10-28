@@ -589,9 +589,16 @@ def after_received(room: Room, target: int, card: str):
                        (cfg.feedback == 'negative_only_triangle' and p.char == 0))
     if card == "start":
         apply_feedback(room, target, False, is_start=True)
+    elif cfg.feedback == 'count_color':
+        # Berlin #05: a human must publicly announce the count; AI announces automatically.
+        # Only the recipient knows the received color unless the card was face up.
+        if p.bot:
+            p.goal = bot_goal(room, target)
+            apply_feedback(room, target, False)
+        else:
+            room.phase = 'announce'
+            room.pending = {'to': target, 'card': card}
     elif forced_negative:
-        # These missions prohibit normal green/red choice; the public face is red.
-        # Berlin #05 also announces the recipient's count of the received color.
         if p.bot:
             p.goal = bot_goal(room, target)
         apply_feedback(room, target, False)
@@ -660,6 +667,7 @@ def apply_feedback(room: Room, i: int, positive: bool, is_start=False):
         if cfg.feedback=='count_color' and room.pending_transfer is not None:
             received_color=col(room.pending_transfer['card'])
             room.turn_events[-1]['announced_count']=sum(col(c)==received_color for c in p.hand)
+            room.turn_events[-1]['announced_at']=time.time()
     if room.pending_transfer is not None:
         transfer = room.pending_transfer
         if transfer["to"] == i and transfer["card"] != "start":
@@ -1394,7 +1402,7 @@ def snapshot(room: Room, viewer: int, inspect: Optional[int] = None):
     if pending:
         if room.phase=='guess':
             pending.pop('card',None)  # receiver must guess before looking
-        if room.phase=='feedback' and view!=pending['to']:
+        if room.phase in ('feedback', 'announce') and view!=pending['to']:
             pending.pop('card',None)
         if room.phase=='offer_choice':
             pending.pop('cards',None) # sender hand remains confidential
@@ -1414,6 +1422,8 @@ def snapshot(room: Room, viewer: int, inspect: Optional[int] = None):
         "my_token": owner.token, "my_character": room.players[view].char,
         "is_owner": owner.token == room.owner,
         "debug": room.debug, "inspect": inspect,
+        "announcement_count": (sum(col(c)==col(room.pending['card']) for c in room.players[view].hand)
+                               if room.phase == 'announce' and room.pending and room.pending['to']==view else None),
         "turn": room.turn, "pending": pending,
         "starting_player": next((i for i, p in enumerate(room.players) if "start" in p.hand), None) if room.move_count == 0 else None,
         "history": room.history[-40:], "moves": room.move_count,
@@ -1543,6 +1553,12 @@ def action(body: ActionBody):
                         or room.pending.get("to") != i or body.positive is None):
                     raise ValueError("It is not your feedback turn")
                 apply_feedback(room, i, body.positive)
+            elif body.type == "announce":
+                if (rule(room).feedback != 'count_color' or room.phase != 'announce'
+                        or room.pending is None or room.pending.get('to') != i):
+                    raise ValueError('Only the receiving player may confirm the announcement')
+                # Count is derived server-side, never trusted from the client.
+                apply_feedback(room, i, False)
             elif body.type == "advance_ai":
                 # Any participating human can request the next single AI action.
                 advance_bot(room)
