@@ -702,9 +702,9 @@ def apply_feedback(room: Room, i: int, positive: bool, is_start=False):
         append_history(room, f"{p.name}: {p_text} feedback. ({left} Time Chips left; spent {cost})")
     room.pending = None
     room.phase = "turn"
-    # No one is declared complete merely by receiving, except the last player.
-    if left<=0 and not p.done and room.phase!='ended':
-        finish(room, False, f"Time Chips ran out before {p.name} completed a set.")
+    # Spending the final chip is legal. A player fails only when they receive
+    # another card and cannot pay the required feedback chip (after_received).
+    # This applies to individual and shared chip pools alike.
 
 def bot_number_guess(room: Room, receiver: int) -> int:
     """Guess based on the four copies of each number in the full deck.
