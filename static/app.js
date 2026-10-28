@@ -105,7 +105,7 @@ async function action(type, extra={}){
 }
 function topBar(){
   const subtitle = state ? `MISSION // ${cityLabel(currentCity()).toUpperCase()} 0${state.mission}` : 'ONLINE CO-OP PLAYTEST';
-  return `<header class="brandbar"><div class="brand">S.O.R.T. <b>5</b><small>${subtitle}</small></div><div class="header-right">${state?`<span class="chip">${state.humans} human · ${4-state.humans} AI</span><button type="button" class="chip code" data-do="copy">ROOM ${escapeHTML(state.code)} ⧉</button><button type="button" class="chip leave-btn" data-do="leave">Leave Game</button>`:''}</div></header>`;
+  return `<header class="brandbar"><div class="brand">S.O.R.T. <b>5</b><small>${subtitle}</small></div><div class="header-right">${state?`<span class="chip">${state.humans} human · ${4-state.humans} AI</span><button type="button" class="chip code" data-do="copy">ROOM ${escapeHTML(state.code)} ⧉</button>${state.is_owner?'<button type="button" class="chip retry-top-btn" data-do="retry_confirm">↻ Retry</button>':''}<button type="button" class="chip leave-btn" data-do="leave">Leave Game</button>`:''}</div></header>`;
 }
 function missionImage(mission,side,city=selectedHomeCity){
   return assets(`${cityAssetPrefix(city)}_${String(mission).padStart(2,'0')}_${side==='story'?'front':'back'}.png`);
@@ -141,7 +141,7 @@ function welcome(){
   app.innerHTML = `<div class="main welcome">${topBar()}<section class="hero"><div class="eyebrow">Happy Baobab / Digital Playtest</div><h1>Mission <span>S.O.R.T. 5</span></h1><p>Exchange information without speaking freely. Read each other's reactions, manage your Time Chips, and complete all four Information Sets.</p></section>
   <div class="welcome-grid"><section class="panel"><h2>Create a game room</h2><form id="create-form">
     <div class="field"><label>Your name</label><input name="name" maxlength="32" placeholder="e.g. Martin" value="${escapeHTML(lobbyDraft.createName)}" required /></div>
-    <div class="field"><label for="home-city">City</label><select id="home-city" name="city" aria-label="Select city">${CITIES.map(c=>`<option value="${c.id}" ${c.id===selectedHomeCity?'selected':''} ${!c.ready?'disabled':''}>${c.name}${c.ready?'':' · Artwork pending'}</option>`).join('')}</select><label id="mission-picker-label" style="margin-top:10px">Mission</label><input type="hidden" id="home-mission" name="mission" value="${selectedHomeMission}" /><div class="mission-pick-buttons" role="group" aria-labelledby="mission-picker-label">${[1,2,3,4,5].map(n=>`<button type="button" class="mission-pick ${selectedHomeMission===n?'active':''}" data-pick-mission="${n}" aria-pressed="${selectedHomeMission===n}">#0${n}</button>`).join('')}</div></div>
+    <div class="field"><label for="home-city">City</label><select id="home-city" name="city" aria-label="Select city">${CITIES.map(c=>`<option value="${c.id}" ${c.id===selectedHomeCity?'selected':''} ${!c.ready?'disabled':''}>${c.name} · ${'★'.repeat(c.stars)} (${c.stars}/6)${c.ready?'':' · Artwork pending'}</option>`).join('')}</select><label id="mission-picker-label" style="margin-top:10px">Mission</label><input type="hidden" id="home-mission" name="mission" value="${selectedHomeMission}" /><div class="mission-pick-buttons" role="group" aria-labelledby="mission-picker-label">${[1,2,3,4,5].map(n=>`<button type="button" class="mission-pick ${selectedHomeMission===n?'active':''}" data-pick-mission="${n}" aria-pressed="${selectedHomeMission===n}">#0${n}</button>`).join('')}</div></div>
     <div id="home-mission-preview" class="home-mission-preview">${homePreview()}</div><p class="small-note" id="city-dev-note" style="margin:4px 0 12px">${'Development playtest: some city-specific rules are still under review.'}</p>
     <div class="field"><label>Human players</label><select name="humans"><option value="1" ${lobbyDraft.humans==='1'?'selected':''}>1 human + 3 AI</option><option value="2" ${lobbyDraft.humans==='2'?'selected':''}>2 humans + 2 AI</option><option value="3" ${lobbyDraft.humans==='3'?'selected':''}>3 humans + 1 AI</option><option value="4" ${lobbyDraft.humans==='4'?'selected':''}>4 humans (online room)</option></select></div>
     
@@ -258,7 +258,7 @@ function offerChoicePanel(){
  const recipient=state.offer.to===state.me && state.inspect===null;
  const source=state.players[state.offer.from];
  if(!recipient)return `<section class="offer-choice-panel"><strong>Two-card offer in progress</strong><p>Waiting for ${escapeHTML(state.players[state.offer.to]?.name||'recipient')} to choose one of the offered cards.</p></section>`;
- return `<section class="offer-choice-panel"><strong>Choose One Card</strong><p>${escapeHTML(source.name)} offered 2 cards. Choose one without seeing hidden faces. The other returns to the sender.</p>
+ return `<section class="offer-choice-panel"><strong>Choose One Card</strong><p>${escapeHTML(source.name)} offered 2 cards. ${state.city==='berlin' && state.mission===3?'Look at both cards and choose one.':'Choose one of the offered cards.'} The other returns to the sender.</p>
    <div class="offer-options">${[0,1].map(i=>{
      const card=state.offer.public_cards?.[i];
      return `<button type="button" class="offer-option" data-offer-choice="${i}"><img src="${imageFor(card?{id:card,visible:true}:null)}" alt="Offered card ${i+1}" /><span>Choose Card ${i+1}</span></button>`;
@@ -359,7 +359,8 @@ function playerHandDock(){
  const hand=p.hand.map(c=>{
    if(!c.id)return '';
    const enabled=choosing && (state.phase!=='reveal'||c.id!=='start');
-   return `<button class="hand-item ${selectedCard===c.id||secondOfferCard===c.id?'picked':''}" data-card="${escapeHTML(c.id)}" ${enabled?'':'disabled'} aria-pressed="${selectedCard===c.id||secondOfferCard===c.id}" title="${c.public?'Face up':''}"><img src="${imageFor(c)}" alt="${escapeHTML(c.id)}"/>${c.public?'<span class="known-card">PUBLIC</span>':''}</button>`;
+   const justReceived=c.id===p.last_received;
+   return `<button class="hand-item ${selectedCard===c.id||secondOfferCard===c.id?'picked':''} ${justReceived?'just-received':''}" data-card="${escapeHTML(c.id)}" ${enabled?'':'disabled'} aria-pressed="${selectedCard===c.id||secondOfferCard===c.id}" title="${justReceived?'Most recently received card':c.public?'Face up':''}"><img src="${imageFor(c)}" alt="${escapeHTML(c.id)}"/>${c.public?'<span class="known-card">PUBLIC</span>':''}${justReceived?'<span class="received-tag">NEW</span>':''}</button>`;
  }).join('');
  let actions='';
  if(state.phase==='lobby'){
@@ -382,7 +383,10 @@ function playerHandDock(){
    actions=`<div class="selected-destination">${selectedCard?`Selected: <b>${escapeHTML(selectedCard==='start'?'Starting Card':selectedCard)}</b>`:'Select a card'}<br>${selectedTarget!==null?`Recipient: <b>${escapeHTML(state.players[selectedTarget].name)}</b><br>Confirm in Team Status above.`:'Then select a teammate in Team Status above.'}</div>`;
  } else if(state.phase==='ended'){
    const success=state.result==='success';
-   actions=state.is_owner?`<button class="btn primary dock-button" data-do="${success&&state.mission<5?'next':'retry'}">${success&&state.mission<5?'Next Mission →':success?'Play Mission Again':'Retry Mission →'}</button>`:`<span class="dock-wait">Waiting for the host to continue.</span>`;
+   const hasNext=state.mission<5 || CITIES.findIndex(c=>c.id===currentCity())<CITIES.length-1;
+   const nextCity=state.mission===5 ? CITIES[CITIES.findIndex(c=>c.id===currentCity())+1] : null;
+   const nextLabel=nextCity?`Next City: ${nextCity.name} #01 →`:'Next Mission →';
+   actions=state.is_owner?`<button class="btn primary dock-button" data-do="${success&&hasNext?'next':'retry'}">${success&&hasNext?nextLabel:success?'Play Mission Again':'Retry Mission →'}</button>`:`<span class="dock-wait">Waiting for the host to continue.</span>`;
  } else if(state.phase==='turn' && state.ai_waiting && !readOnly && state.inspect===null){
    actions=`<span class="dock-wait">It is an AI turn. Use the <b>Advance AI Turn</b> button above Deduction History to advance one turn at a time.</span>`;
  } else if(state.phase==='feedback'){
@@ -391,7 +395,7 @@ function playerHandDock(){
    actions=`<span class="dock-wait">${state.inspect!==null?'Inspection mode · Read only':'It is not your turn.'}</span>`;
  }
  return `<section class="hand-dock" aria-label="Your hand and game controls">
-   <div class="dock-head"><div><h2>Your Hand <span>${p.hand_size} cards</span></h2><p>${instruction}</p></div><div class="dock-pills"><span class="dock-seat">${escapeHTML(p.symbol||'○')} ${escapeHTML(p.name)}</span>${p.chips!==null?`<span class="dock-chip">◷ ${p.chips}</span>`:''}</div></div>
+   <div class="dock-head"><div><h2>Your Hand <span>${p.hand_size} cards</span></h2><p>${instruction}${p.last_received&&p.hand.some(c=>c.id===p.last_received)?` · <strong class="received-help">NEW = most recently received card</strong>`:''}</p></div><div class="dock-pills"><span class="dock-seat">${escapeHTML(p.symbol||'○')} ${escapeHTML(p.name)}</span>${p.chips!==null?`<span class="dock-chip">◷ ${p.chips}</span>`:''}</div></div>
    <div class="dock-body"><div class="dock-hand">${hand||'<div class="no-hand">Waiting for the game to start.</div>'}</div><div class="dock-controls">${actions}</div></div>
  </section>`;
 }
@@ -400,7 +404,9 @@ function overlayPanel(){
  const n=String(state.mission).padStart(2,'0');
  const links=state.debug&&state.is_owner?`<section class="debug-sub"><h3>Developer Test · Player Views</h3><p>Inspection mode lets the host see private hands. Do not use it in a real game.</p><div class="debug-actions">${state.players.map(p=>`<a target="_blank" rel="noopener" href="/?room=${encodeURIComponent(state.code)}&inspect=${p.index}">${escapeHTML(p.name)} ↗</a>`).join('')}</div></section>`:'';
  let content='';
- if(overlay==='leave'){
+ if(overlay==='retry'){
+  content=`<div class="leave-confirm"><h3>Retry this mission?</h3><p>The current deal and progress will be discarded for everyone in this room.</p><p>All players will return to the character-selection setup after the host starts the mission again.</p><div class="leave-actions"><button class="btn ghost" data-overlay="close">Cancel</button><button class="btn warn" data-do="confirm_retry">Retry Mission</button></div></div>`;
+ }else if(overlay==='leave'){
   content=`<div class="leave-confirm"><h3>Leave this game?</h3><p>Your current play session will be closed on this device. You will return to the home screen.</p><p class="help-warning">Other players may remain in the room. This does not end the room for everyone.</p><div class="leave-actions"><button class="btn ghost" data-overlay="close">Stay in Game</button><button class="btn warn" data-do="confirm_leave">Leave Game</button></div></div>`;
  }else if(overlay==='mission'){
   content=`<div class="mission-view-tabs"><button data-side="rules" class="${missionSide==='rules'?'active':''}">Mission Rules</button><button data-side="story" class="${missionSide==='story'?'active':''}">Mission Story</button></div>
@@ -411,7 +417,7 @@ function overlayPanel(){
   <h3>Deduction History</h3><p>Only cards that were face up during play are identified. Face-down cards remain hidden. Select a character to filter their received-card history.</p>
   <p class="help-warning">Provisional rule: receiving the Starting Card costs one red Time Chip. This exception is not explicitly addressed in the supplied rulebook.</p>${links}</div>`;
  }
- return `<div class="modal-shade" data-backdrop="true"><section class="modal-dialog" role="dialog" aria-modal="true" aria-label="${overlay==='mission'?'Mission Card':overlay==='leave'?'Leave Game':'Game Rules'}"><header class="modal-header"><div><span class="eyebrow">S.O.R.T. 5</span><h2>${overlay==='mission'?`${cityLabel(currentCity()).toUpperCase()} #${n}`:overlay==='leave'?'Leave Game':'Game Rules'}</h2></div><button class="modal-close" data-overlay="close" aria-label="Close">✕</button></header>${content}</section></div>`;
+ return `<div class="modal-shade" data-backdrop="true"><section class="modal-dialog" role="dialog" aria-modal="true" aria-label="${overlay==='mission'?'Mission Card':overlay==='leave'?'Leave Game':overlay==='retry'?'Retry Mission':'Game Rules'}"><header class="modal-header"><div><span class="eyebrow">S.O.R.T. 5</span><h2>${overlay==='mission'?`${cityLabel(currentCity()).toUpperCase()} #${n}`:overlay==='leave'?'Leave Game':overlay==='retry'?'Retry Mission':'Game Rules'}</h2></div><button class="modal-close" data-overlay="close" aria-label="Close">✕</button></header>${content}</section></div>`;
 }
 function historyWarningModal(){
  return `<div class="modal-shade history-warning-shade" role="presentation"><section class="history-warning" role="dialog" aria-modal="true" aria-label="Unlock Deduction History"><h2>Unlock Deduction History?</h2><p>SORT 5 is designed around remembering card exchanges and reading other players’ reactions. Showing previous turns will make the game easier.</p><strong>Would you like to see the history?</strong><div class="history-warning-actions"><button type="button" class="btn ghost" data-history-warning="cancel">Keep Hidden</button><button type="button" class="btn primary" data-history-warning="confirm">Show History</button></div></section></div>`;
@@ -423,7 +429,8 @@ function render(){
  if(journalPerson!=='all' && (!state.players[Number(journalPerson)]))journalPerson='all';
  app.innerHTML=`<main class="main game-main phase-${state.phase}">${topBar()}${errorText?`<div class="alert" role="alert">${escapeHTML(errorText)}</div>`:''}${missionRibbon()}
    ${state.inspect!==null?'<div class="inspect-banner">TEST MODE · Viewing another player’s screen. Controls are disabled.</div>':''}
-   <div class="play-grid"><div class="board-column">${playerBoard()}${currentStage()}${playerHandDock()}</div><div class="journal-column">${missionCardPanel()}${aiTurnActionPanel()}${journalPanel()}</div></div>
+   <div class="mobile-ai-turn-bar">${aiTurnActionPanel()}</div>
+   <div class="play-grid"><div class="board-column">${playerBoard()}${currentStage()}${playerHandDock()}</div><div class="journal-column">${missionCardPanel()}<div class="desktop-ai-turn">${aiTurnActionPanel()}</div>${journalPanel()}</div></div>
    <footer class="foot">SORT 5 · SPECIAL ACTIONS DEV v2.9 · Private hands are kept separate by the server.</footer>
    ${overlayPanel()}${historyWarningOpen?historyWarningModal():''}</main>`;
  if(journalScroll && document.getElementById('journal-scroll'))document.getElementById('journal-scroll').scrollTop=scrollY;
@@ -451,7 +458,9 @@ function render(){
  document.querySelector('[data-backdrop]')?.addEventListener('click',e=>{if(e.target===e.currentTarget){overlay=null;render();}});
  document.querySelectorAll('[data-do]').forEach(b=>b.addEventListener('click',async()=>{
    const a=b.dataset.do;
-   if(a==='leave'){overlay='leave';render();}
+   if(a==='retry_confirm'){overlay='retry';render();}
+   else if(a==='confirm_retry'){overlay=null;await action('retry');}
+   else if(a==='leave'){overlay='leave';render();}
    else if(a==='confirm_leave'){
      const currentCode=credentials?.code;
      credentials=null;state=null;overlay=null;errorText='';selectedCard=null;secondOfferCard=null;selectedTarget=null;journalPerson='all';historyUnlocked=false;historyVisible=false;historyWarningOpen=false;lastSnapshotSignature='';

@@ -348,7 +348,8 @@ def offer_cards(room: Room, i: int, cards: list[str], target: int):
     if len(cards)!=2 or cards[0]==cards[1] or not all(can_pass(room,i,c,target) for c in cards):
         raise ValueError("Offer exactly two different cards to an eligible recipient")
     room.phase='offer_choice'
-    room.pending={'from':i,'to':target,'cards':cards[:], 'public_cards':[c if c in room.public or room.players[i].char in cfg.faceup else None for c in cards]}
+    room.pending={'from':i,'to':target,'cards':cards[:], 'public_cards':[c if c in room.public or room.players[i].char in cfg.faceup else None for c in cards],
+                  'recipient_cards': cards[:] if room.city == 'berlin' and room.mission == 3 else None}
     append_history(room,f"{room.players[i].name} offered two cards to {room.players[target].name}.")
     if room.players[target].bot:
         # Only publicly shown cards can affect the receiving bot's choice.
@@ -719,7 +720,7 @@ def bot_offer_choice(room: Room, receiver: int) -> int:
     have indistinguishable backs, so pick at random. Visible offerings can be
     compared against the bot's current hypothesis and owned numbers.
     """
-    offered = room.pending['public_cards']
+    offered = room.pending.get('recipient_cards') or room.pending['public_cards']
     bot = room.players[receiver]
     if not any(offered):
         return random.randrange(2)
@@ -1242,6 +1243,11 @@ def bot_choice(room: Room, i: int):
                     score += 5.5
                     if route['color'] == color:
                         score += 6.5
+                # Berlin #01: favor cards that the required first finisher
+                # has *actually* signaled as useful. Avoid forcing speculative
+                # passes based on unseen hands (tested against baseline).
+                if room.city == 'berlin' and room.mission == 1 and route['character'] is not None and dest.char == route['character'] and pref > 0:
+                    score += 2.0 * min(pref, 3.0)
                 # Avoid accelerating a visibly nearly-finished wrong-order
                 # player. They could be holding the needed set already.
                 if public_count >= 3 and not ai_can_finish_now(room, target, color):
@@ -1333,6 +1339,8 @@ def snapshot(room: Room, viewer: int, inspect: Optional[int] = None):
             "chips": p.chips if room.phase not in ("lobby", "characters") else None,
             "done": p.done, "is_me": i == view,
             "hand": [visible_card(c, c in room.public, show) for c in p.hand],
+            # Only the holder sees the newest received card's identity.
+            "last_received": p.last_received if show and p.last_received in p.hand else None,
             "hand_size": len(p.hand), "revealed": p.reveal_done,
             "held_face_down": p.held_card is not None,
         })
@@ -1354,7 +1362,7 @@ def snapshot(room: Room, viewer: int, inspect: Optional[int] = None):
         "initial_pass_submitted": str(viewer) in room.initial_passes,
         # Never return internal pending card IDs or the unguessed number to other players.
         "offer": ({"from": room.pending["from"], "to": room.pending["to"],
-                   "public_cards": room.pending["public_cards"]}
+                   "public_cards": (room.pending.get("recipient_cards") or room.pending["public_cards"]) if viewer == room.pending["to"] else room.pending["public_cards"]}
                   if room.phase == 'offer_choice' and room.pending else None),
         "players": players, "me": view, "original_me": viewer,
         "my_token": owner.token, "my_character": room.players[view].char,
@@ -1493,10 +1501,11 @@ def action(body: ActionBody):
                 # Any participating human can request the next single AI action.
                 advance_bot(room)
             elif body.type == "retry":
-                if room.phase != "ended":
-                    raise ValueError("You can restart only after a mission ends")
                 if room.owner != p.token:
                     raise ValueError("Only the room owner can restart")
+                # The host explicitly confirmed restarting the current mission.
+                # Keep participant credentials and room code, clear the old deal.
+
                 room.players = room.players[:room.humans]
                 room.phase = "lobby"
                 room.turn = None;room.pending = None
@@ -1505,12 +1514,18 @@ def action(body: ActionBody):
                     human.held_card=None;human.start_pass_confirmed=False
                 room.history.clear();room.turn_events.clear();room.public.clear();room.result=None;room.reason=""
                 room.completion_order.clear();room.initial_passes.clear();room.shared_chips=None;room.last_guess_wrong=False
+                room.move_count=0;room.evidence.clear();room.pending_transfer=None
             elif body.type == "next":
                 if room.phase != "ended" or room.result != "success" or room.owner != p.token:
                     raise ValueError("Only the host may start the next mission after success")
                 if room.mission == 5:
-                    raise ValueError("All five city missions are complete")
-                room.mission += 1
+                    current_index = CITY_ORDER.index(room.city)
+                    if current_index == len(CITY_ORDER) - 1:
+                        raise ValueError("All 30 missions are complete")
+                    room.city = CITY_ORDER[current_index + 1]
+                    room.mission = 1
+                else:
+                    room.mission += 1
                 room.phase = "lobby"
                 room.players = room.players[:room.humans]
                 room.turn = None;room.pending = None
