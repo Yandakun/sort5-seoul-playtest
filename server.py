@@ -588,7 +588,13 @@ def after_received(room: Room, target: int, card: str):
     forced_negative = (cfg.feedback in ('negative_only', 'count_color') or
                        (cfg.feedback == 'negative_only_triangle' and p.char == 0))
     if card == "start":
-        apply_feedback(room, target, False, is_start=True)
+        # Starting Card is a normal feedback decision for a human recipient.
+        # Bots make the choice automatically; forced-red missions still enforce red.
+        if p.bot:
+            apply_feedback(room, target, False, is_start=True)
+        else:
+            room.phase = "feedback"
+            room.pending = {"to": target, "card": card}
     elif cfg.feedback == 'count_color':
         # Berlin #05: a human must publicly announce the count; AI announces automatically.
         # Only the recipient knows the received color unless the card was face up.
