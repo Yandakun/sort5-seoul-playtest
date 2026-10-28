@@ -473,7 +473,7 @@ def ai_transfer_routes(room: Room, source: int) -> list[int]:
 
     This uses the same physical-seat restrictions as normal card passes, but
     does not require it to be that player's turn or inspect their hand.
-    Completed seats are skipped only for left/right, never for opposite.
+    Opposite restrictions exist only while all four seats are active.
     """
     cfg = rule(room)
     ch = room.players[source].char
@@ -487,7 +487,7 @@ def ai_transfer_routes(room: Room, source: int) -> list[int]:
             continue
         if ch in cfg.left_only and j != left:
             continue
-        if ch in cfg.forbidden_opposite and j == opposite:
+        if active == 4 and ch in cfg.forbidden_opposite and j == opposite:
             continue
         if ch in cfg.forbidden_right and j == right and active > 2:
             continue
@@ -527,7 +527,7 @@ def can_pass(room: Room, i: int, c: str, target: int):
     right=relative_seat(room, i, "right", skip_done=True)
     opposite=relative_seat(room, i, "opposite")
     if ch in cfg.left_only and target!=left: return False
-    if ch in cfg.forbidden_opposite and target==opposite: return False
+    if active==4 and ch in cfg.forbidden_opposite and target==opposite: return False
     if ch in cfg.forbidden_right and target==right and active>2: return False
     return True
 
@@ -1105,25 +1105,12 @@ def ai_can_finish_now(room: Room, player_idx: int, color: str) -> bool:
 
 
 def ai_safe_to_leave_table(room: Room, finisher: int) -> bool:
-    """Avoid knowingly stranding two remaining players with no legal route.
+    """Completing a set never strands two players due to opposite restriction.
 
-    Fixed opposite seats do not rotate when someone finishes. If the last two
-    active players would be physically opposite and the mission forbids that
-    transfer, an AI should postpone finishing when it can. This check uses
-    only seats, completion flags and public mission restrictions.
+    Once anyone completes a set, there are fewer than four active seats,
+    and the opposite-seat prohibition no longer applies. Other restrictions
+    (left-only/right-forbidden) continue to use their own mission rules.
     """
-    remaining = [j for j, p in enumerate(room.players)
-                 if j != finisher and not p.done]
-    if len(remaining) != 2:
-        return True
-    left, right = remaining
-    cfg = rule(room)
-    seats = [(room.players[j].seat if room.players[j].seat is not None else j)
-             for j in remaining]
-    opposite = (seats[0] - seats[1]) % 4 == 2
-    if opposite and (room.players[left].char in cfg.forbidden_opposite
-                     or room.players[right].char in cfg.forbidden_opposite):
-        return False
     return True
 
 
@@ -1184,16 +1171,6 @@ def ai_scheduler_value(room: Room, sender: int, recipient: int, color: str,
         chips = room.players[recipient].chips
         if chips <= 3:
             score -= (4-chips)*1.4*max(0.,0.55-fit)
-    # Opposite-forbidden missions create a hub when three seats remain.
-    # Preserve chip capacity at a potential unavoidable relay player.
-    if len(active)==3:
-        cfg=rule(room)
-        if cfg.forbidden_opposite:
-            other = [i for i in active if i!=recipient]
-            seat = lambda i: room.players[i].seat if room.players[i].seat is not None else i
-            if (seat(other[0])-seat(other[1])) % 4 == 2:
-                # Recipient is the unique middle seat between the endpoints.
-                score -= 2.0 * max(0.,0.55-fit)
     return score
 
 
