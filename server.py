@@ -818,6 +818,50 @@ def visible_preference(room: Room, bot_i: int, dest_i: int, color: str) -> float
     return weight
 
 
+def feedback_priority_v47(room: Room, observer: int, target: int, color: str) -> float:
+    """Observable recent feedback, compared against other recipients' demand.
+
+    A bot may connect a reaction to a color only for a card it sent or a
+    publicly visible card. Forced-negative modes are not rejections. This
+    score NEVER reads other players' private hands or internal goals.
+    """
+    cfg = rule(room)
+    if cfg.feedback in ('count_color', 'negative_only'):
+        return 0.0
+    if cfg.feedback == 'negative_only_triangle' and room.players[target].char == 0:
+        return 0.0
+
+    def strongest_recent(recipient):
+        latest = None
+        for e in room.evidence:
+            if e['to'] != recipient or e['color'] != color:
+                continue
+            if e['sender'] != observer and not e['public']:
+                continue
+            # Ignore feedback that was compulsory for this recipient.
+            if cfg.feedback == 'negative_only_triangle' and room.players[recipient].char == 0:
+                continue
+            if latest is None or e['step'] > latest['step']:
+                latest = e
+        if latest is None:
+            return 0.0
+        age = max(0, room.move_count - latest['step'])
+        return (1.0 if latest['positive'] else -1.0) * (0.90 ** age)
+
+    direct = strongest_recent(target)
+    if direct == 0:
+        return 0.0
+    # Recent red: strongly discourage repeating the color to this player.
+    if direct < 0:
+        return 7.0 * direct
+    # Recent green: prioritize this known need, unless an *observably*
+    # competing player has a stronger recent claim. Not a permanent lock.
+    competitors = [strongest_recent(j) for j, p in enumerate(room.players)
+                   if j != target and j != observer and not p.done]
+    competition = max([0.0] + competitors)
+    return 5.0 * direct - 2.0 * max(0.0, competition - direct)
+
+
 def bayesian_assignment_beliefs(room: Room, observer: int) -> dict[int, dict[str, float]]:
     """An optional, *observer-limited* posterior over the 24 unique color roles.
 
@@ -1219,6 +1263,8 @@ def bot_choice(room: Room, i: int):
                 if os.getenv("SORT5_SCHEDULER", "off").lower() == "on":
                     score += ai_scheduler_value(room, i, target, color, team_beliefs)
                 score += 1.10 * pref
+                if os.getenv('SORT5_FEEDBACK_V47', 'off').lower() == 'on':
+                    score += feedback_priority_v47(room, i, target, color)
                 # Refuse to blindly send cards to someone who has repeatedly
                 # responded red to this color.
                 if pref < -2.0:
